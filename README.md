@@ -25,6 +25,8 @@ The config file for this external provider is a simple toml used to configure th
 
 A sample config file can be found [in the testdata folder](./testdata/garm-provider-incus.toml).
 
+NOTE: This provider only has the `images:` remote configured. If you're coming from LXD, and you need `ubuntu` images, please use the `cloud` variant of the ubunt images (ie: `images:ubuntu/22.04/cloud`).
+
 ## Tweaking the provider
 
 Garm supports sending opaque json encoded configs to the IaaS providers it hooks into. This allows the providers to implement some very provider specific functionality that doesn't necessarily translate well to other providers. Features that may exists on Azure, may not exist on AWS or OpenStack and vice versa.
