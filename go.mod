@@ -4,7 +4,7 @@ go 1.21.5
 
 require (
 	github.com/BurntSushi/toml v1.2.1
-	github.com/cloudbase/garm-provider-common v0.1.0
+	github.com/cloudbase/garm-provider-common v0.1.1
 	github.com/juju/clock v1.0.3
 	github.com/juju/retry v1.0.0
 	github.com/lxc/incus v0.3.0
