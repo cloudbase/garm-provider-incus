@@ -31,6 +31,7 @@ import (
 
 	"github.com/cloudbase/garm-provider-common/cloudconfig"
 	commonParams "github.com/cloudbase/garm-provider-common/params"
+	"github.com/cloudbase/garm-provider-common/util"
 )
 
 var _ execution.ExternalProvider = &Incus{}
@@ -53,19 +54,6 @@ const (
 )
 
 var (
-	// incusToGithubArchMap translates Incus architectures to Github tools architectures.
-	// TODO: move this in a separate package. This will most likely be used
-	// by any other provider.
-	incusToGithubArchMap map[string]string = map[string]string{
-		"x86_64":  "x64",
-		"amd64":   "x64",
-		"armv7l":  "arm",
-		"aarch64": "arm64",
-		"x64":     "x64",
-		"arm":     "arm",
-		"arm64":   "arm64",
-	}
-
 	configToIncusArchMap map[commonParams.OSArch]string = map[commonParams.OSArch]string{
 		commonParams.Amd64: "x86_64",
 		commonParams.Arm64: "aarch64",
@@ -172,34 +160,6 @@ func (l *Incus) getProfiles(ctx context.Context, flavor string) ([]string, error
 	return ret, nil
 }
 
-func (l *Incus) getTools(tools []commonParams.RunnerApplicationDownload, osType commonParams.OSType, architecture string) (commonParams.RunnerApplicationDownload, error) {
-	// Validate image OS. Linux only for now.
-	switch osType {
-	case commonParams.Linux:
-	default:
-		return commonParams.RunnerApplicationDownload{}, fmt.Errorf("this provider does not support OS type: %s", osType)
-	}
-
-	// Find tools for OS/Arch.
-	for _, tool := range tools {
-		if tool.GetOS() == "" || tool.GetArchitecture() == "" {
-			continue
-		}
-
-		// fmt.Println(*tool.Architecture, *tool.OS)
-		// fmt.Printf("image arch: %s --> osType: %s\n", image.Architecture, string(osType))
-		if tool.GetArchitecture() == architecture && tool.GetOS() == string(osType) {
-			return tool, nil
-		}
-
-		arch, ok := incusToGithubArchMap[architecture]
-		if ok && arch == tool.GetArchitecture() && tool.GetOS() == string(osType) {
-			return tool, nil
-		}
-	}
-	return commonParams.RunnerApplicationDownload{}, fmt.Errorf("failed to find tools for OS %s and arch %s", osType, architecture)
-}
-
 // sadly, the security.secureboot flag is a string encoded boolean.
 func (l *Incus) secureBootEnabled() string {
 	if l.cfg.SecureBoot {
@@ -228,7 +188,7 @@ func (l *Incus) getCreateInstanceArgs(ctx context.Context, bootstrapParams commo
 		return api.InstancesPost{}, errors.Wrap(err, "getting instance source")
 	}
 
-	tools, err := l.getTools(bootstrapParams.Tools, bootstrapParams.OSType, arch)
+	tools, err := util.GetTools(bootstrapParams.OSType, bootstrapParams.OSArch, bootstrapParams.Tools)
 	if err != nil {
 		return api.InstancesPost{}, errors.Wrap(err, "getting tools")
 	}
@@ -239,6 +199,10 @@ func (l *Incus) getCreateInstanceArgs(ctx context.Context, bootstrapParams commo
 	cloudCfg, err := cloudconfig.GetCloudConfig(bootstrapParams, tools, bootstrapParams.Name)
 	if err != nil {
 		return api.InstancesPost{}, errors.Wrap(err, "generating cloud-config")
+	}
+
+	if bootstrapParams.OSType == commonParams.Windows {
+		cloudCfg = fmt.Sprintf("#ps1_sysnative\n%s", cloudCfg)
 	}
 
 	configMap := map[string]string{
