@@ -72,6 +72,15 @@ const (
 	DefaultProjectName        = "garm-project"
 )
 
+type ToolFetchFunc func(osType commonParams.OSType, osArch commonParams.OSArch, tools []commonParams.RunnerApplicationDownload) (commonParams.RunnerApplicationDownload, error)
+
+type GetCloudConfigFunc func(bootstrapParams commonParams.BootstrapInstance, tools commonParams.RunnerApplicationDownload, runnerName string) (string, error)
+
+var (
+	DefaultToolFetch      ToolFetchFunc      = util.GetTools
+	DefaultGetCloudconfig GetCloudConfigFunc = cloudconfig.GetCloudConfig
+)
+
 func NewIncusProvider(configFile, controllerID string) (execution.ExternalProvider, error) {
 	cfg, err := config.NewConfig(configFile)
 	if err != nil {
@@ -96,11 +105,24 @@ func NewIncusProvider(configFile, controllerID string) (execution.ExternalProvid
 	return provider, nil
 }
 
+type InstanceServerInterface interface {
+	GetProject(string) (*api.Project, string, error)
+	UseProject(string) incus.InstanceServer
+	GetProfileNames() ([]string, error)
+	CreateInstance(api.InstancesPost) (incus.Operation, error)
+	UpdateInstanceState(string, api.InstanceStatePut, string) (incus.Operation, error)
+	GetInstanceFull(string) (*api.InstanceFull, string, error)
+	DeleteInstance(string) (incus.Operation, error)
+	GetInstancesFull(api.InstanceType) ([]api.InstanceFull, error)
+	GetImageAliasArchitectures(string, string) (map[string]*api.ImageAliasesEntry, error)
+	GetImage(string) (*api.Image, string, error)
+}
+
 type Incus struct {
 	// cfg is the provider config for this provider.
 	cfg *config.Incus
 	// cli is the Incus client.
-	cli incus.InstanceServer
+	cli InstanceServerInterface
 	// imageManager downloads images from remotes
 	imageManager *image
 	// controllerID is the ID of this controller
@@ -109,7 +131,7 @@ type Incus struct {
 	mux sync.Mutex
 }
 
-func (l *Incus) getCLI(ctx context.Context) (incus.InstanceServer, error) {
+func (l *Incus) getCLI(ctx context.Context) (InstanceServerInterface, error) {
 	l.mux.Lock()
 	defer l.mux.Unlock()
 
@@ -188,7 +210,7 @@ func (l *Incus) getCreateInstanceArgs(ctx context.Context, bootstrapParams commo
 		return api.InstancesPost{}, errors.Wrap(err, "getting instance source")
 	}
 
-	tools, err := util.GetTools(bootstrapParams.OSType, bootstrapParams.OSArch, bootstrapParams.Tools)
+	tools, err := DefaultToolFetch(bootstrapParams.OSType, bootstrapParams.OSArch, bootstrapParams.Tools)
 	if err != nil {
 		return api.InstancesPost{}, errors.Wrap(err, "getting tools")
 	}
@@ -196,7 +218,7 @@ func (l *Incus) getCreateInstanceArgs(ctx context.Context, bootstrapParams commo
 	bootstrapParams.UserDataOptions.DisableUpdatesOnBoot = specs.DisableUpdates
 	bootstrapParams.UserDataOptions.ExtraPackages = specs.ExtraPackages
 	bootstrapParams.UserDataOptions.EnableBootDebug = specs.EnableBootDebug
-	cloudCfg, err := cloudconfig.GetCloudConfig(bootstrapParams, tools, bootstrapParams.Name)
+	cloudCfg, err := DefaultGetCloudconfig(bootstrapParams, tools, bootstrapParams.Name)
 	if err != nil {
 		return api.InstancesPost{}, errors.Wrap(err, "generating cloud-config")
 	}

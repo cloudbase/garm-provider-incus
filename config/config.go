@@ -132,7 +132,7 @@ func (l *Incus) GetInstanceType() IncusImageType {
 func (l *Incus) Validate() error {
 	if l.UnixSocket != "" {
 		if _, err := os.Stat(l.UnixSocket); err != nil {
-			return fmt.Errorf("could not access unix socket %s: %q", l.UnixSocket, err)
+			return fmt.Errorf("could not access unix socket %s: %w", l.UnixSocket, err)
 		}
 
 		return nil
@@ -156,16 +156,16 @@ func (l *Incus) Validate() error {
 	}
 
 	if _, err := os.Stat(l.ClientCertificate); err != nil {
-		return fmt.Errorf("failed to access client certificate %s: %q", l.ClientCertificate, err)
+		return fmt.Errorf("failed to access client certificate %s: %w", l.ClientCertificate, err)
 	}
 
 	if _, err := os.Stat(l.ClientKey); err != nil {
-		return fmt.Errorf("failed to access client key %s: %q", l.ClientKey, err)
+		return fmt.Errorf("failed to access client key %s: %w", l.ClientKey, err)
 	}
 
 	if l.TLSServerCert != "" {
 		if _, err := os.Stat(l.TLSServerCert); err != nil {
-			return fmt.Errorf("failed to access tls_server_certificate %s: %q", l.TLSServerCert, err)
+			return fmt.Errorf("failed to access tls_server_certificate %s: %w", l.TLSServerCert, err)
 		}
 	}
 

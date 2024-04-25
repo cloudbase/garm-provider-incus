@@ -5,6 +5,7 @@ go 1.21.5
 require (
 	github.com/BurntSushi/toml v1.2.1
 	github.com/cloudbase/garm-provider-common v0.1.2-0.20240111235646-a9efac12b060
+	github.com/gorilla/websocket v1.5.1
 	github.com/juju/clock v1.0.3
 	github.com/juju/retry v1.0.0
 	github.com/lxc/incus v0.3.0
@@ -21,7 +22,6 @@ require (
 	github.com/gorilla/handlers v1.5.1 // indirect
 	github.com/gorilla/schema v1.2.1 // indirect
 	github.com/gorilla/securecookie v1.1.2 // indirect
-	github.com/gorilla/websocket v1.5.1 // indirect
 	github.com/juju/errors v1.0.0 // indirect
 	github.com/juju/loggo v1.0.0 // indirect
 	github.com/juju/testing v1.0.2 // indirect
@@ -34,6 +34,7 @@ require (
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/rogpeppe/go-internal v1.12.0 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
+	github.com/stretchr/objx v0.5.0 // indirect
 	github.com/teris-io/shortid v0.0.0-20220617161101-71ec9f2aa569 // indirect
 	github.com/xeipuuv/gojsonpointer v0.0.0-20180127040702-4e3ac2762d5f // indirect
 	github.com/xeipuuv/gojsonreference v0.0.0-20180127040603-bd5ef7bd5415 // indirect
