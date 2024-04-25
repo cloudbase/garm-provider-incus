@@ -16,6 +16,7 @@
 package config
 
 import (
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -93,7 +94,7 @@ func TestIncusWithInvalidUnixSocket(t *testing.T) {
 	cfg.UnixSocket = "bogus unix socket"
 	err := cfg.Validate()
 	require.NotNil(t, err)
-	require.EqualError(t, err, "could not access unix socket bogus unix socket: \"stat bogus unix socket: no such file or directory\"")
+	require.ErrorIs(t, err, os.ErrNotExist)
 }
 
 func TestMissingUnixSocketAndMissingURL(t *testing.T) {
@@ -144,14 +145,14 @@ func TestIncusIvalidCertOrKeyPaths(t *testing.T) {
 	cfg.ClientCertificate = "/i/am/not/here"
 	err := cfg.Validate()
 	require.NotNil(t, err)
-	require.EqualError(t, err, "failed to access client certificate /i/am/not/here: \"stat /i/am/not/here: no such file or directory\"")
+	require.ErrorIs(t, err, os.ErrNotExist)
 
 	cfg.ClientCertificate = "../testdata/incus/certs/client.crt"
 	cfg.ClientKey = "/me/neither"
 
 	err = cfg.Validate()
 	require.NotNil(t, err)
-	require.EqualError(t, err, "failed to access client key /me/neither: \"stat /me/neither: no such file or directory\"")
+	require.ErrorIs(t, err, os.ErrNotExist)
 }
 
 func TestIncusInvalidServerCertPath(t *testing.T) {
@@ -160,7 +161,7 @@ func TestIncusInvalidServerCertPath(t *testing.T) {
 
 	err := cfg.Validate()
 	require.NotNil(t, err)
-	require.EqualError(t, err, "failed to access tls_server_certificate /not/a/valid/server/cert/path: \"stat /not/a/valid/server/cert/path: no such file or directory\"")
+	require.ErrorIs(t, err, os.ErrNotExist)
 }
 
 func TestInvalidIncusImageRemotes(t *testing.T) {

@@ -1,0 +1,44 @@
+name: Go Tests
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  go-tests-linux:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Setup Golang
+        uses: actions/setup-go@v3
+        with:
+          go-version-file: go.mod
+
+      - run: go version
+
+      - name: Run GARM Go Tests
+        run: make go-test
+
+  go-tests-windows:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Setup Golang
+        uses: actions/setup-go@v3
+        with:
+          go-version-file: go.mod
+
+      - run: go version
+
+      - name: Run GARM Go Tests
+        run: go test -v ./... -timeout=15m -parallel=4

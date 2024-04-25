@@ -219,3 +219,7 @@ func (l *Incus) waitInstanceHasIP(ctx context.Context, instanceName string) (com
 
 	return p, nil
 }
+
+func ptr[T any](v T) *T {
+	return &v
+}
