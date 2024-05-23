@@ -118,7 +118,11 @@ func getClientFromConfig(ctx context.Context, cfg *config.Incus) (cli incus.Inst
 	}
 
 	if cfg.UnixSocket != "" {
-		return incus.ConnectIncusUnixWithContext(ctx, cfg.UnixSocket, nil)
+		return incus.ConnectIncusUnixWithContext(ctx, cfg.UnixSocket, &incus.ConnectionArgs{SkipGetServer: true})
+	}
+
+	if cfg.URL == "" {
+		return nil, fmt.Errorf("no URL or UnixSocket specified")
 	}
 
 	var srvCrtContents, tlsCAContents, clientCertContents, clientKeyContents []byte
@@ -156,6 +160,7 @@ func getClientFromConfig(ctx context.Context, cfg *config.Incus) (cli incus.Inst
 		TLSCA:         string(tlsCAContents),
 		TLSClientCert: string(clientCertContents),
 		TLSClientKey:  string(clientKeyContents),
+		SkipGetServer: true,
 	}
 
 	incusCLI, err := incus.ConnectIncus(cfg.URL, &connectArgs)

@@ -48,6 +48,7 @@ type ImageServer interface {
 
 	// Image handling functions
 	GetImages() (images []api.Image, err error)
+	GetImagesAllProjects() (images []api.Image, err error)
 	GetImageFingerprints() (fingerprints []string, err error)
 	GetImagesWithFilter(filters []string) (images []api.Image, err error)
 
@@ -182,6 +183,9 @@ type InstanceServer interface {
 	RenameImageAlias(name string, alias api.ImageAliasesEntryPost) (err error)
 	DeleteImageAlias(name string) (err error)
 
+	// Configuration metadata functions
+	GetMetadataConfiguration() (meta *api.MetadataConfiguration, err error)
+
 	// Network functions ("network" API extension)
 	GetNetworkNames() (names []string, err error)
 	GetNetworks() (networks []api.Network, err error)
@@ -245,6 +249,15 @@ type InstanceServer interface {
 	UpdateNetworkZoneRecord(zone string, name string, record api.NetworkZoneRecordPut, ETag string) (err error)
 	DeleteNetworkZoneRecord(zone string, name string) (err error)
 
+	// Network integrations functions ("network_integrations" API extension)
+	GetNetworkIntegrationNames() (names []string, err error)
+	GetNetworkIntegrations() (integrations []api.NetworkIntegration, err error)
+	GetNetworkIntegration(name string) (integration *api.NetworkIntegration, ETag string, err error)
+	CreateNetworkIntegration(integration api.NetworkIntegrationsPost) (err error)
+	UpdateNetworkIntegration(name string, integration api.NetworkIntegrationPut, ETag string) (err error)
+	RenameNetworkIntegration(name string, integration api.NetworkIntegrationPost) (err error)
+	DeleteNetworkIntegration(name string) (err error)
+
 	// Operation functions
 	GetOperationUUIDs() (uuids []string, err error)
 	GetOperations() (operations []api.Operation, err error)
@@ -296,6 +309,12 @@ type InstanceServer interface {
 	CreateStoragePoolBucketKey(poolName string, bucketName string, key api.StorageBucketKeysPost) (newKey *api.StorageBucketKey, err error)
 	UpdateStoragePoolBucketKey(poolName string, bucketName string, keyName string, key api.StorageBucketKeyPut, ETag string) (err error)
 	DeleteStoragePoolBucketKey(poolName string, bucketName string, keyName string) (err error)
+
+	// Storage bucket backup functions ("storage_bucket_backup" API extension)
+	CreateStoragePoolBucketBackup(poolName string, bucketName string, backup api.StorageBucketBackupsPost) (op Operation, err error)
+	DeleteStoragePoolBucketBackup(pool string, bucketName string, name string) (op Operation, err error)
+	GetStoragePoolBucketBackupFile(pool string, bucketName string, name string, req *BackupFileRequest) (resp *BackupFileResponse, err error)
+	CreateStoragePoolBucketFromBackup(pool string, args StoragePoolBucketBackupArgs) (op Operation, err error)
 
 	// Storage volume functions ("storage" API extension)
 	GetStoragePoolVolumeNames(pool string) (names []string, err error)
@@ -633,4 +652,14 @@ type InstanceFileResponse struct {
 
 	// If a directory, the list of files inside it
 	Entries []string
+}
+
+// The StoragePoolBucketBackupArgs struct is used when creating a storage volume from a backup.
+// API extension: storage_bucket_backup.
+type StoragePoolBucketBackupArgs struct {
+	// The backup file
+	BackupFile io.Reader
+
+	// Name to import backup as
+	Name string
 }

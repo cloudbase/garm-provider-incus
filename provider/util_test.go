@@ -21,7 +21,6 @@ import (
 
 	commonParams "github.com/cloudbase/garm-provider-common/params"
 	"github.com/cloudbase/garm-provider-incus/config"
-	incus "github.com/lxc/incus/client"
 	"github.com/lxc/incus/shared/api"
 	"github.com/stretchr/testify/assert"
 )
@@ -80,59 +79,48 @@ func TestGetClientFromConfig(t *testing.T) {
 	tests := []struct {
 		name      string
 		cfg       *config.Incus
-		expected  incus.InstanceServer
 		errString string
 	}{
 		{
 			name:      "Nil config",
 			cfg:       nil,
-			expected:  nil,
 			errString: "no Incus configuration found",
 		},
 		{
 			name:      "empty config",
 			cfg:       &config.Incus{},
-			expected:  nil,
-			errString: "connecting to Incus",
-		},
-		{
-			name: "invalid UnixSocket",
-			cfg: &config.Incus{
-				UnixSocket: "invalid",
-			},
-			expected:  nil,
-			errString: " dial unix invalid",
+			errString: "no URL or UnixSocket specified",
 		},
 		{
 			name: "invalid TSLServerCert",
 			cfg: &config.Incus{
+				URL:           "https://localhost:8443",
 				TLSServerCert: "invalid",
 			},
-			expected:  nil,
 			errString: "reading TLSServerCert",
 		},
 		{
 			name: "invalid TLSCA",
 			cfg: &config.Incus{
+				URL:   "https://localhost:8443",
 				TLSCA: "invalid",
 			},
-			expected:  nil,
 			errString: "reading TLSCA",
 		},
 		{
 			name: "invalid ClientCertificate",
 			cfg: &config.Incus{
+				URL:               "https://localhost:8443",
 				ClientCertificate: "invalid",
 			},
-			expected:  nil,
 			errString: "reading ClientCertificate",
 		},
 		{
 			name: "invalid ClientKey",
 			cfg: &config.Incus{
+				URL:       "https://localhost:8443",
 				ClientKey: "invalid",
 			},
-			expected:  nil,
 			errString: "reading ClientKey",
 		},
 	}
@@ -142,10 +130,11 @@ func TestGetClientFromConfig(t *testing.T) {
 			output, err := getClientFromConfig(ctx, tt.cfg)
 			if tt.errString != "" {
 				assert.ErrorContains(t, err, tt.errString)
+				assert.Nil(t, output)
 			} else {
 				assert.NoError(t, err)
+				assert.NotNil(t, output)
 			}
-			assert.Equal(t, tt.expected, output)
 		})
 	}
 

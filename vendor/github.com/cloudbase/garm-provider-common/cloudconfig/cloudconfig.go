@@ -34,6 +34,7 @@ func NewDefaultCloudInitConfig() *CloudInit {
 			"curl",
 			"tar",
 		},
+		Users: []string{"default"},
 		SystemInfo: &SystemInfo{
 			DefaultUser: DefaultUser{
 				Name:   defaults.DefaultUser,
@@ -69,6 +70,7 @@ type File struct {
 type CloudInit struct {
 	mux sync.Mutex
 
+	Users             []string    `yaml:"users"`
 	PackageUpgrade    bool        `yaml:"package_upgrade"`
 	Packages          []string    `yaml:"packages,omitempty"`
 	SSHAuthorizedKeys []string    `yaml:"ssh_authorized_keys,omitempty"`
