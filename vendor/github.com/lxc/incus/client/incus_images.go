@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"slices"
 	"strings"
 	"time"
 
@@ -27,6 +28,26 @@ func (r *ProtocolIncus) GetImages() ([]api.Image, error) {
 	images := []api.Image{}
 
 	_, err := r.queryStruct("GET", "/images?recursion=1", nil, "", &images)
+	if err != nil {
+		return nil, err
+	}
+
+	return images, nil
+}
+
+// GetImagesAllProjects returns a list of images across all projects as Image structs.
+func (r *ProtocolIncus) GetImagesAllProjects() ([]api.Image, error) {
+	images := []api.Image{}
+
+	v := url.Values{}
+	v.Set("recursion", "1")
+	v.Set("all-projects", "true")
+
+	if !r.HasExtension("images_all_projects") {
+		return nil, fmt.Errorf("The server is missing the required \"images_all_projects\" API extension")
+	}
+
+	_, err := r.queryStruct("GET", fmt.Sprintf("/images?%s", v.Encode()), nil, "", &images)
 	if err != nil {
 		return nil, err
 	}
@@ -260,7 +281,7 @@ func incusDownloadImage(fingerprint string, uri string, userAgent string, do fun
 			return nil, err
 		}
 
-		if !util.ValueInSlice(part.FormName(), []string{"rootfs", "rootfs.img"}) {
+		if !slices.Contains([]string{"rootfs", "rootfs.img"}, part.FormName()) {
 			return nil, fmt.Errorf("Invalid multipart image")
 		}
 

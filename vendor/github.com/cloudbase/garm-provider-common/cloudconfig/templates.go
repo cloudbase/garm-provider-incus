@@ -154,6 +154,10 @@ SVC_NAME=$(cat /home/{{ .RunnerUsername }}/actions-runner/.service)
 sendStatus "generating systemd unit file"
 getRunnerFile "systemd/unit-file?runAsUser={{ .RunnerUsername }}" "$SVC_NAME" || fail "failed to get service file"
 sudo mv $SVC_NAME /etc/systemd/system/ || fail "failed to move service file"
+sudo chown root:root /etc/systemd/system/$SVC_NAME || fail "failed to change owner"
+if [ -e "/sys/fs/selinux" ];then
+	sudo chcon -h system_u:object_r:systemd_unit_file_t:s0 /etc/systemd/system/$SVC_NAME || fail "failed to change selinux context"
+fi
 
 sendStatus "enabling runner service"
 cp /home/{{ .RunnerUsername }}/actions-runner/bin/runsvc.sh /home/{{ .RunnerUsername }}/actions-runner/ || fail "failed to copy runsvc.sh"
@@ -169,9 +173,9 @@ attempt=1
 while true; do
 	ERROUT=$(mktemp)
 	{{- if .GitHubRunnerGroup }}
-	./config.sh --unattended --url "{{ .RepoURL }}" --token "$GITHUB_TOKEN" --runnergroup {{.GitHubRunnerGroup}} --name "{{ .RunnerName }}" --labels "{{ .RunnerLabels }}" --ephemeral 2>$ERROUT
+	./config.sh --unattended --url "{{ .RepoURL }}" --token "$GITHUB_TOKEN" --runnergroup {{.GitHubRunnerGroup}} --name "{{ .RunnerName }}" --labels "{{ .RunnerLabels }}" --no-default-labels --ephemeral 2>$ERROUT
 	{{- else}}
-	./config.sh --unattended --url "{{ .RepoURL }}" --token "$GITHUB_TOKEN" --name "{{ .RunnerName }}" --labels "{{ .RunnerLabels }}" --ephemeral 2>$ERROUT
+	./config.sh --unattended --url "{{ .RepoURL }}" --token "$GITHUB_TOKEN" --name "{{ .RunnerName }}" --labels "{{ .RunnerLabels }}" --no-default-labels --ephemeral 2>$ERROUT
 	{{- end}}
 	if [ $? -eq 0 ]; then
 		rm $ERROUT || true
@@ -202,8 +206,7 @@ sudo ./svc.sh install {{ .RunnerUsername }} || fail "failed to install service"
 {{- end}}
 
 if [ -e "/sys/fs/selinux" ];then
-	sudo chcon -h user_u:object_r:bin_t /home/runner/ || fail "failed to change selinux context"
-	sudo chcon -R -h {{ .RunnerUsername }}:object_r:bin_t /home/runner/* || fail "failed to change selinux context"
+	sudo chcon -R -h user_u:object_r:bin_t:s0 /home/runner/ || fail "failed to change selinux context"
 fi
 
 AGENT_ID=""

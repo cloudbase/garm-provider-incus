@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	neturl "net/url"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -17,7 +18,6 @@ import (
 	"github.com/lxc/incus/shared/api"
 	"github.com/lxc/incus/shared/logger"
 	"github.com/lxc/incus/shared/tcp"
-	"github.com/lxc/incus/shared/util"
 )
 
 // ProtocolIncus represents an Incus API server.
@@ -89,7 +89,7 @@ func (r *ProtocolIncus) GetConnectionInfo() (*ConnectionInfo, error) {
 			}
 
 			url := fmt.Sprintf("https://%s", addr)
-			if !util.ValueInSlice(url, urls) {
+			if !slices.Contains(urls, url) {
 				urls = append(urls, url)
 			}
 		}
@@ -221,7 +221,7 @@ func incusParseResponse(resp *http.Response) (*api.Response, string, error) {
 
 	// Handle errors
 	if response.Type == api.ErrorResponse {
-		return nil, "", api.StatusErrorf(resp.StatusCode, response.Error)
+		return &response, "", api.StatusErrorf(resp.StatusCode, response.Error)
 	}
 
 	return &response, etag, nil
