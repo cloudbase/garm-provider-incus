@@ -44,6 +44,21 @@ const jsonSchema string = `
 			"enable_boot_debug": {
 				"type": "boolean",
 				"description": "Allows providers to set the -x flag in the runner install script."
+			},
+			"runner_install_template": {
+				"type": "string",
+				"description": "This option can be used to override the default runner install template. If used, the caller is responsible for the correctness of the template as well as the suitability of the template for the target OS. Use the extra_context extra spec if your template has variables in it that need to be expanded."
+			},
+			"extra_context": {
+				"type": "object",
+				"description": "Extra context that will be passed to the runner_install_template.",
+				"additionalProperties": {
+					"type": "string"
+				}
+			},
+			"pre_install_scripts": {
+				"type": "object",
+				"description": "A map of pre-install scripts that will be run before the runner install script. These will run as root and can be used to prep a generic image before we attempt to install the runner. The key of the map is the name of the script as it will be written to disk. The value is a byte array with the contents of the script."
 			}
 		},
 		"additionalProperties": false
