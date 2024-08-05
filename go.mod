@@ -1,11 +1,13 @@
 module github.com/cloudbase/garm-provider-incus
 
-go 1.21.5
+go 1.22
+
+toolchain go1.22.3
 
 require (
 	github.com/BurntSushi/toml v1.3.2
-	github.com/cloudbase/garm-provider-common v0.1.2
-	github.com/gorilla/websocket v1.5.1
+	github.com/cloudbase/garm-provider-common v0.1.3
+	github.com/gorilla/websocket v1.5.4-0.20240702125206-a62d9d2a8413
 	github.com/juju/clock v1.0.3
 	github.com/juju/retry v1.0.0
 	github.com/lxc/incus v0.7.0
@@ -38,12 +40,12 @@ require (
 	github.com/xeipuuv/gojsonpointer v0.0.0-20190905194746-02993c407bfb // indirect
 	github.com/xeipuuv/gojsonreference v0.0.0-20180127040603-bd5ef7bd5415 // indirect
 	github.com/zitadel/oidc/v2 v2.12.0 // indirect
-	golang.org/x/crypto v0.23.0 // indirect
-	golang.org/x/net v0.25.0 // indirect
+	golang.org/x/crypto v0.25.0 // indirect
+	golang.org/x/net v0.27.0 // indirect
 	golang.org/x/oauth2 v0.20.0 // indirect
-	golang.org/x/sys v0.20.0 // indirect
-	golang.org/x/term v0.20.0 // indirect
-	golang.org/x/text v0.15.0 // indirect
+	golang.org/x/sys v0.22.0 // indirect
+	golang.org/x/term v0.22.0 // indirect
+	golang.org/x/text v0.16.0 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
 	gopkg.in/square/go-jose.v2 v2.6.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
