@@ -12,16 +12,16 @@
 //    License for the specific language governing permissions and limitations
 //    under the License.
 
-package execution
+package executionv010
 
-type ExecutionCommand string
-
-const (
-	CreateInstanceCommand     ExecutionCommand = "CreateInstance"
-	DeleteInstanceCommand     ExecutionCommand = "DeleteInstance"
-	GetInstanceCommand        ExecutionCommand = "GetInstance"
-	ListInstancesCommand      ExecutionCommand = "ListInstances"
-	StartInstanceCommand      ExecutionCommand = "StartInstance"
-	StopInstanceCommand       ExecutionCommand = "StopInstance"
-	RemoveAllInstancesCommand ExecutionCommand = "RemoveAllInstances"
+import (
+	common "github.com/cloudbase/garm-provider-common/execution/common"
 )
+
+// ExternalProvider defines an interface that external providers need to implement.
+// This is very similar to the common.Provider interface, and was redefined here to
+// decouple it, in case it may diverge from native providers.
+type ExternalProvider interface {
+	// The common ExternalProvider interface
+	common.ExternalProvider
+}

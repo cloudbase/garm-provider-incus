@@ -22,7 +22,7 @@ import (
 	"time"
 
 	runnerErrors "github.com/cloudbase/garm-provider-common/errors"
-	"github.com/cloudbase/garm-provider-common/execution"
+	execution "github.com/cloudbase/garm-provider-common/execution/v0.1.0"
 	"github.com/cloudbase/garm-provider-incus/config"
 
 	incus "github.com/lxc/incus/client"
@@ -35,6 +35,8 @@ import (
 )
 
 var _ execution.ExternalProvider = &Incus{}
+
+var Version = "v0.0.0-unknown"
 
 const (
 	// We look for this key in the config of the instances to determine if they are
@@ -492,4 +494,9 @@ func (l *Incus) Stop(ctx context.Context, instance string, force bool) error {
 // Start boots up an instance.
 func (l *Incus) Start(ctx context.Context, instance string) error {
 	return l.setState(ctx, instance, "start", false)
+}
+
+// GetVersion returns the version of the provider.
+func (l *Incus) GetVersion(ctx context.Context) string {
+	return Version
 }
