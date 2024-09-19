@@ -19,103 +19,158 @@ import (
 	"encoding/json"
 	"testing"
 
-	commonParams "github.com/cloudbase/garm-provider-common/params"
+	"github.com/cloudbase/garm-provider-common/cloudconfig"
+	"github.com/cloudbase/garm-provider-common/params"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func TestJsonSchemaValidation(t *testing.T) {
-	tests := []struct {
-		name      string
-		input     json.RawMessage
-		errString string
-	}{
-		{
-			name: "Valid input",
-			input: json.RawMessage(`{
-				"disable_updates": true,
-				"extra_packages": ["openssh-server", "jq"],
-				"enable_boot_debug": false
-			}`),
-			errString: "",
+var testCases = []struct {
+	name           string
+	input          json.RawMessage
+	expectedOutput extraSpecs
+	errString      string
+}{
+	{
+		name:  "full specs",
+		input: json.RawMessage(`{"disable_updates": true, "extra_packages": ["package1", "package2"], "enable_boot_debug": true, "runner_install_template": "IyEvYmluL2Jhc2gKZWNobyBJbnN0YWxsaW5nIHJ1bm5lci4uLg==", "pre_install_scripts": {"setup.sh": "IyEvYmluL2Jhc2gKZWNobyBTZXR1cCBzY3JpcHQuLi4="}, "extra_context": {"key": "value"}}`),
+		expectedOutput: extraSpecs{
+			DisableUpdates:  true,
+			ExtraPackages:   []string{"package1", "package2"},
+			EnableBootDebug: true,
+			CloudConfigSpec: cloudconfig.CloudConfigSpec{
+				RunnerInstallTemplate: []byte("#!/bin/bash\necho Installing runner..."),
+				PreInstallScripts: map[string][]byte{
+					"setup.sh": []byte("#!/bin/bash\necho Setup script..."),
+				},
+				ExtraContext: map[string]string{"key": "value"},
+			},
 		},
-		{
-			name: "Invalid input - wrong data type",
-			input: json.RawMessage(`{
-				"disable_updates": "true"
-			}`),
-			errString: "schema validation failed: [disable_updates: Invalid type. Expected: boolean, given: string]",
+		errString: "",
+	},
+	{
+		name:  "specs just with disable_updates",
+		input: json.RawMessage(`{"disable_updates": true}`),
+		expectedOutput: extraSpecs{
+			DisableUpdates: true,
 		},
-		{
-			name: "Invalid input - additional property",
-			input: json.RawMessage(`{
-				"additional_property": true
-			}`),
-			errString: "Additional property additional_property is not allowed",
+		errString: "",
+	},
+	{
+		name:  "specs just with extra_packages",
+		input: json.RawMessage(`{"extra_packages": ["package1", "package2"]}`),
+		expectedOutput: extraSpecs{
+			ExtraPackages: []string{"package1", "package2"},
 		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			err := jsonSchemaValidation(tt.input)
-			if tt.errString == "" {
-				assert.NoError(t, err, "Expected no error, got %v", err)
-			} else {
-				assert.Error(t, err, "Expected an error")
-				if err != nil {
-					assert.Contains(t, err.Error(), tt.errString, "Error message does not match")
-				}
-			}
-		})
-	}
+		errString: "",
+	},
+	{
+		name:  "specs just with enable_boot_debug",
+		input: json.RawMessage(`{"enable_boot_debug": true}`),
+		expectedOutput: extraSpecs{
+			EnableBootDebug: true,
+		},
+		errString: "",
+	},
+	{
+		name:  "specs just with runner_install_template",
+		input: json.RawMessage(`{"runner_install_template": "IyEvYmluL2Jhc2gKZWNobyBJbnN0YWxsaW5nIHJ1bm5lci4uLg=="}`),
+		expectedOutput: extraSpecs{
+			CloudConfigSpec: cloudconfig.CloudConfigSpec{
+				RunnerInstallTemplate: []byte("#!/bin/bash\necho Installing runner..."),
+			},
+		},
+		errString: "",
+	},
+	{
+		name:  "specs just with pre_install_scripts",
+		input: json.RawMessage(`{"pre_install_scripts": {"setup.sh": "IyEvYmluL2Jhc2gKZWNobyBTZXR1cCBzY3JpcHQuLi4="}}`),
+		expectedOutput: extraSpecs{
+			CloudConfigSpec: cloudconfig.CloudConfigSpec{
+				PreInstallScripts: map[string][]byte{
+					"setup.sh": []byte("#!/bin/bash\necho Setup script..."),
+				},
+			},
+		},
+		errString: "",
+	},
+	{
+		name:  "specs just with extra_context",
+		input: json.RawMessage(`{"extra_context": {"key": "value"}}`),
+		expectedOutput: extraSpecs{
+			CloudConfigSpec: cloudconfig.CloudConfigSpec{
+				ExtraContext: map[string]string{"key": "value"},
+			},
+		},
+		errString: "",
+	},
+	{
+		name:           "empty specs",
+		input:          json.RawMessage(`{}`),
+		expectedOutput: extraSpecs{},
+		errString:      "",
+	},
+	{
+		name:           "invalid json",
+		input:          json.RawMessage(`{"disable_updates": true, "extra_packages": ["package1", "package2", "enable_boot_debug": true}`),
+		expectedOutput: extraSpecs{},
+		errString:      "failed to validate extra specs",
+	},
+	{
+		name:           "invalid input for disable_updates - wrong data type",
+		input:          json.RawMessage(`{"disable_updates": "true"}`),
+		expectedOutput: extraSpecs{},
+		errString:      "schema validation failed: [disable_updates: Invalid type. Expected: boolean, given: string]",
+	},
+	{
+		name:           "invalid input for extra_packages - wrong data type",
+		input:          json.RawMessage(`{"extra_packages": "package1"}`),
+		expectedOutput: extraSpecs{},
+		errString:      "schema validation failed: [extra_packages: Invalid type. Expected: array, given: string]",
+	},
+	{
+		name:           "invalid input for enable_boot_debug - wrong data type",
+		input:          json.RawMessage(`{"enable_boot_debug": "true"}`),
+		expectedOutput: extraSpecs{},
+		errString:      "schema validation failed: [enable_boot_debug: Invalid type. Expected: boolean, given: string]",
+	},
+	{
+		name:           "invalid input for runner_install_template - wrong data type",
+		input:          json.RawMessage(`{"runner_install_template": true}`),
+		expectedOutput: extraSpecs{},
+		errString:      "schema validation failed: [runner_install_template: Invalid type. Expected: string, given: boolean]",
+	},
+	{
+		name:           "invalid input for pre_install_scripts - wrong data type",
+		input:          json.RawMessage(`{"pre_install_scripts": "setup.sh"}`),
+		expectedOutput: extraSpecs{},
+		errString:      "schema validation failed: [pre_install_scripts: Invalid type. Expected: object, given: string]",
+	},
+	{
+		name:           "invalid input for extra_context - wrong data type",
+		input:          json.RawMessage(`{"extra_context": ["key", "value"]}`),
+		expectedOutput: extraSpecs{},
+		errString:      "schema validation failed: [extra_context: Invalid type. Expected: object, given: array]",
+	},
+	{
+		name:           "invalid input - additional property",
+		input:          json.RawMessage(`{"additional_property": true}`),
+		expectedOutput: extraSpecs{},
+		errString:      "Additional property additional_property is not allowed",
+	},
 }
 
-func TestExtraSpecs(t *testing.T) {
-	tests := []struct {
-		name           string
-		specs          commonParams.BootstrapInstance
-		expectedOutput extraSpecs
-		errString      string
-	}{
-		{
-			name: "Empty specs",
-			specs: commonParams.BootstrapInstance{
-				ExtraSpecs: nil,
-			},
-			expectedOutput: extraSpecs{},
-			errString:      "",
-		},
-		{
-			name: "Valid specs",
-			specs: commonParams.BootstrapInstance{
-				ExtraSpecs: []byte(`{"disable_updates": true, "extra_packages": ["package1", "package2"], "enable_boot_debug": false}`),
-			},
-			expectedOutput: extraSpecs{
-				DisableUpdates:  true,
-				ExtraPackages:   []string{"package1", "package2"},
-				EnableBootDebug: false,
-			},
-			errString: "",
-		},
-		{
-			name: "Invalid specs",
-			specs: commonParams.BootstrapInstance{
-				ExtraSpecs: []byte(`{"disable_updates": true, "extra_packages": ["package1", "package2", "package3"], "enable_boot_debug": "false"}`),
-			},
-			expectedOutput: extraSpecs{},
-			errString:      "Invalid type. Expected: boolean, given: string",
-		},
-	}
-
-	for _, tt := range tests {
+func TestParseExtraSpecsFromBootstrapParams(t *testing.T) {
+	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
-			output, err := parseExtraSpecsFromBootstrapParams(tt.specs)
+			got, err := parseExtraSpecsFromBootstrapParams(params.BootstrapInstance{ExtraSpecs: tt.input})
+			assert.Equal(t, tt.expectedOutput, got)
 			if tt.errString != "" {
-				assert.ErrorContains(t, err, tt.errString)
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.errString)
 			} else {
 				require.NoError(t, err)
 			}
-			assert.Equal(t, tt.expectedOutput, output)
 		})
 	}
 }
