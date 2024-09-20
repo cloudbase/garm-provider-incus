@@ -30,6 +30,7 @@ import (
 	"github.com/cloudbase/garm-provider-common/util"
 	"github.com/cloudbase/garm-provider-incus/config"
 
+	"github.com/invopop/jsonschema"
 	"github.com/juju/clock"
 	"github.com/juju/retry"
 	incus "github.com/lxc/incus/client"
@@ -227,4 +228,14 @@ func (l *Incus) waitInstanceHasIP(ctx context.Context, instanceName string) (com
 
 func ptr[T any](v T) *T {
 	return &v
+}
+
+func generateJSONSchema() *jsonschema.Schema {
+	reflector := jsonschema.Reflector{
+		AllowAdditionalProperties: false,
+	}
+	// Reflect the extraSpecs struct
+	schema := reflector.Reflect(extraSpecs{})
+
+	return schema
 }

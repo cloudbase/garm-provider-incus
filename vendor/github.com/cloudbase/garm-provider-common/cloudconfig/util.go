@@ -30,7 +30,7 @@ type CloudConfigSpec struct {
 	// RunnerInstallTemplate can be used to override the default runner install template.
 	// If used, the caller is responsible for the correctness of the template as well as the
 	// suitability of the template for the target OS.
-	RunnerInstallTemplate []byte `json:"runner_install_template"`
+	RunnerInstallTemplate []byte `json:"runner_install_template,omitempty" jsonschema:"title=default runner install template,description=This option can be used to override the default runner install template. If used, the caller is responsible for the correctness of the template as well as the suitability of the template for the target OS. Use the extra_context extra spec if your template has variables in it that need to be expanded."`
 	// PreInstallScripts is a map of pre-install scripts that will be run before the
 	// runner install script. These will run as root and can be used to prep a generic image
 	// before we attempt to install the runner. The key of the map is the name of the script
@@ -44,9 +44,9 @@ type CloudConfigSpec struct {
 	// so it's up to the user what they upload here.
 	// Caution needs to be exercised when using this feature, as the total size of userdata is limited
 	// on most providers.
-	PreInstallScripts map[string][]byte `json:"pre_install_scripts"`
+	PreInstallScripts map[string][]byte `json:"pre_install_scripts,omitempty" jsonschema:"title=pre-install scripts,description= map of pre-install scripts that will be run before the runner install script. These will run as root and can be used to prep a generic image before we attempt to install the runner. The key of the map is the name of the script as it will be written to disk. The value is a byte array with the contents of the script."`
 	// ExtraContext is a map of extra context that will be passed to the runner install template.
-	ExtraContext map[string]string `json:"extra_context"`
+	ExtraContext map[string]string `json:"extra_context,omitempty" jsonschema:"title=map of extra context,description=Extra context that will be passed to the runner_install_template."`
 }
 
 func sortMapKeys(m map[string][]byte) []string {
