@@ -8,7 +8,7 @@ github.com/bahlo/generic-list-go
 # github.com/buger/jsonparser v1.1.1
 ## explicit; go 1.13
 github.com/buger/jsonparser
-# github.com/cloudbase/garm-provider-common v0.1.4-0.20240912084949-899c120c80ce
+# github.com/cloudbase/garm-provider-common v0.1.4-0.20241026163040-5b7633dfb896
 ## explicit; go 1.22
 github.com/cloudbase/garm-provider-common/cloudconfig
 github.com/cloudbase/garm-provider-common/defaults
