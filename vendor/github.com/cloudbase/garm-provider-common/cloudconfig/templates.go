@@ -35,10 +35,8 @@ set -x
 CALLBACK_URL="{{ .CallbackURL }}"
 METADATA_URL="{{ .MetadataURL }}"
 BEARER_TOKEN="{{ .CallbackToken }}"
-{{- if .ExtraContext.OFS_DIR }}
-OFS_DIR_E="{{ .ExtraContext.OFS_DIR }}"
-{{- end }}
-OFS_DIR=${OFS_DIR_E:-"/opt/work"}
+
+RUN_HOME="/home/{{ .RunnerUsername }}/actions-runner"
 
 if [ -z "$METADATA_URL" ];then
 	echo "no token is available and METADATA_URL is not set"
@@ -82,65 +80,26 @@ function fail() {
 	exit 1
 }
 
-# This will echo the version number in the filename. Given a file name like: actions-runner-osx-x64-2.299.1.tar.gz
-# this will output: 2.299.1
-function getRunnerVersion() {
-	FILENAME="{{ .FileName }}"
-	[[ $FILENAME =~ ([0-9]+\.[0-9]+\.[0-9+]) ]]
-	echo $BASH_REMATCH
-}
-
-function getCachedToolsPath() {
-	CACHED_RUNNER="/opt/cache/actions-runner/latest"
-	if [ -d "$CACHED_RUNNER" ];then
-		echo "$CACHED_RUNNER"
-		return 0
-	fi
-
-	VERSION=$(getRunnerVersion)
-	if [ -z "$VERSION" ]; then
-		return 0
-	fi
-
-	CACHED_RUNNER="/opt/cache/actions-runner/$VERSION"
-	if [ -d "$CACHED_RUNNER" ];then
-		echo "$CACHED_RUNNER"
-		return 0
-	fi
-	return 0
-}
-
 function downloadAndExtractRunner() {
 	sendStatus "downloading tools from {{ .DownloadURL }}"
 	if [ ! -z "{{ .TempDownloadToken }}" ]; then
 	TEMP_TOKEN="Authorization: Bearer {{ .TempDownloadToken }}"
 	fi
 	curl --retry 5 --retry-delay 5 --retry-connrefused --fail -L -H "${TEMP_TOKEN}" -o "/home/{{ .RunnerUsername }}/{{ .FileName }}" "{{ .DownloadURL }}" || fail "failed to download tools"
-	mkdir -p /home/{{ .RunnerUsername }}/actions-runner || fail "failed to create actions-runner folder"
+	mkdir -p "$RUN_HOME" || fail "failed to create actions-runner folder"
 	sendStatus "extracting runner"
-	tar xf "/home/{{ .RunnerUsername }}/{{ .FileName }}" -C /home/{{ .RunnerUsername }}/actions-runner/ || fail "failed to extract runner"
-	# chown {{ .RunnerUsername }}:{{ .RunnerGroup }} -R /home/{{ .RunnerUsername }}/actions-runner/ || fail "failed to change owner"
+	tar xf "/home/{{ .RunnerUsername }}/{{ .FileName }}" -C "$RUN_HOME"/ || fail "failed to extract runner"
+	# chown {{ .RunnerUsername }}:{{ .RunnerGroup }} -R "$RUN_HOME"/ || fail "failed to change owner"
 }
 
-CACHED_RUNNER=$(getCachedToolsPath)
-if [ -z "$CACHED_RUNNER" ];then
+if [ ! -d "$RUN_HOME" ];then
 	downloadAndExtractRunner
 	sendStatus "installing dependencies"
-	cd /home/{{ .RunnerUsername }}/actions-runner
+	cd "$RUN_HOME"
 	sudo ./bin/installdependencies.sh || fail "failed to install dependencies"
 else
-	sendStatus "using cached runner found in $CACHED_RUNNER"
-	OFS_AVAIL=1
-	RUN_HOME="/home/{{ .RunnerUsername }}/actions-runner"
-	sudo mkdir -p $OFS_DIR/upper-layer $OFS_DIR/work-layer $RUN_HOME
-	sudo chown {{ .RunnerUsername }}:{{ .RunnerGroup }} -R $OFS_DIR/upper-layer $OFS_DIR/work-layer $CACHED_RUNNER $RUN_HOME
-	sudo mount -t overlay overlay -o lowerdir=$CACHED_RUNNER,upperdir=$OFS_DIR/upper-layer,workdir=$OFS_DIR/work-layer $RUN_HOME || OFS_AVAIL=0
-	if [ $OFS_AVAIL -eq 0 ];then
-		sendStatus "falling back to non-overlayfs mode"
-		sudo cp -a "$CACHED_RUNNER/." $RUN_HOME || fail "failed to copy cached runner"
-		sudo chown {{ .RunnerUsername }}:{{ .RunnerGroup }} -R "$RUN_HOME" || fail "failed to change owner"
-	fi
-	cd /home/{{ .RunnerUsername }}/actions-runner
+	sendStatus "using cached runner found in $RUN_HOME"
+	cd "$RUN_HOME"
 fi
 
 
@@ -155,13 +114,13 @@ function getRunnerFile() {
 }
 
 sendStatus "downloading JIT credentials"
-getRunnerFile "credentials/runner" "/home/{{ .RunnerUsername }}/actions-runner/.runner" || fail "failed to get runner file"
-getRunnerFile "credentials/credentials" "/home/{{ .RunnerUsername }}/actions-runner/.credentials" || fail "failed to get credentials file"
-getRunnerFile "credentials/credentials_rsaparams" "/home/{{ .RunnerUsername }}/actions-runner/.credentials_rsaparams" || fail "failed to get credentials_rsaparams file"
-getRunnerFile "system/service-name" "/home/{{ .RunnerUsername }}/actions-runner/.service" || fail "failed to get service name file"
-sed -i 's/$/\.service/' /home/{{ .RunnerUsername }}/actions-runner/.service
+getRunnerFile "credentials/runner" ""$RUN_HOME"/.runner" || fail "failed to get runner file"
+getRunnerFile "credentials/credentials" ""$RUN_HOME"/.credentials" || fail "failed to get credentials file"
+getRunnerFile "credentials/credentials_rsaparams" ""$RUN_HOME"/.credentials_rsaparams" || fail "failed to get credentials_rsaparams file"
+getRunnerFile "system/service-name" ""$RUN_HOME"/.service" || fail "failed to get service name file"
+sed -i 's/$/\.service/' "$RUN_HOME"/.service
 
-SVC_NAME=$(cat /home/{{ .RunnerUsername }}/actions-runner/.service)
+SVC_NAME=$(cat "$RUN_HOME"/.service)
 
 sendStatus "generating systemd unit file"
 getRunnerFile "systemd/unit-file?runAsUser={{ .RunnerUsername }}" "$SVC_NAME" || fail "failed to get service file"
@@ -172,7 +131,7 @@ if [ -e "/sys/fs/selinux" ];then
 fi
 
 sendStatus "enabling runner service"
-cp /home/{{ .RunnerUsername }}/actions-runner/bin/runsvc.sh /home/{{ .RunnerUsername }}/actions-runner/ || fail "failed to copy runsvc.sh"
+cp "$RUN_HOME"/bin/runsvc.sh "$RUN_HOME"/ || fail "failed to copy runsvc.sh"
 sudo chown {{ .RunnerUsername }}:{{ .RunnerGroup }} -R /home/{{ .RunnerUsername }} || fail "failed to change owner"
 sudo systemctl daemon-reload || fail "failed to reload systemd"
 sudo systemctl enable $SVC_NAME
@@ -229,7 +188,7 @@ sendStatus "starting service"
 sudo ./svc.sh start || fail "failed to start service"
 
 set +e
-AGENT_ID=$(grep "agentId" /home/{{ .RunnerUsername }}/actions-runner/.runner |  tr -d -c 0-9)
+AGENT_ID=$(grep "agentId" "$RUN_HOME"/.runner |  tr -d -c 0-9)
 if [ $? -ne 0 ];then
 	fail "failed to get agent ID"
 fi
@@ -246,6 +205,55 @@ Param(
 )
 
 $ErrorActionPreference="Stop"
+
+function Start-ExecuteWithRetry {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory=$true)]
+        [ScriptBlock]$ScriptBlock,
+        [int]$MaxRetryCount=10,
+        [int]$RetryInterval=3,
+        [string]$RetryMessage,
+        [array]$ArgumentList=@()
+    )
+    PROCESS {
+        $currentErrorActionPreference = $ErrorActionPreference
+        $ErrorActionPreference = "Continue"
+        $retryCount = 0
+        while ($true) {
+            try {
+                $res = Invoke-Command -ScriptBlock $ScriptBlock -ArgumentList $ArgumentList
+                $ErrorActionPreference = $currentErrorActionPreference
+                return $res
+            } catch [System.Exception] {
+                $retryCount++
+
+                if ($_.Exception -is [System.Net.WebException]) {
+                    $webResponse = $_.Exception.Response
+					# Skip retry on Error: 4XX (e.g. 401 Unauthorized, 404 Not Found etc.)
+                    if ($webResponse -and $webResponse.StatusCode -ge 400 -and $webResponse.StatusCode -lt 500) {
+                        # Skip retry on 4xx errors
+                        Write-Output "Encountered non-retryable error (4xx): $($_.Exception.Message)"
+                        $ErrorActionPreference = $currentErrorActionPreference
+                        throw
+                    }
+                }
+
+                if ($retryCount -gt $MaxRetryCount) {
+                    $ErrorActionPreference = $currentErrorActionPreference
+                    throw
+                } else {
+                    if ($RetryMessage) {
+                        Write-Output $RetryMessage
+                    } elseif ($_) {
+                        Write-Output $_
+                    }
+                    Start-Sleep -Seconds $RetryInterval
+                }
+            }
+        }
+    }
+}
 
 function Invoke-FastWebRequest {
 	[CmdletBinding()]
@@ -473,24 +481,32 @@ function Install-Runner() {
 			Import-Certificate -CertificateData $data -StoreName Root -StoreLocation LocalMachine
 		}
 
-		Update-GarmStatus -CallbackURL $CallbackURL -Message "downloading tools from $DownloadURL"
+		$runnerDir = "C:\actions-runner"
+		# Check if a cached runner is available
+		if (-not (Test-Path $runnerDir)) {
+			# No cached runner found, proceed to download and extract
+			Update-GarmStatus -CallbackURL $CallbackURL -Message "downloading tools from {{ .DownloadURL }}"
 
-		$downloadToken="{{.TempDownloadToken}}"
-		$DownloadTokenHeaders=@{}
-		if ($downloadToken.Length -gt 0) {
-			$DownloadTokenHeaders=@{
-				"Authorization"="Bearer $downloadToken"
+			$downloadToken="{{.TempDownloadToken}}"
+			$DownloadTokenHeaders=@{}
+			if ($downloadToken.Length -gt 0) {
+				$DownloadTokenHeaders=@{
+					"Authorization"="Bearer $downloadToken"
+				}
 			}
+
+			$downloadPath = Join-Path $env:TMP "{{ .FileName }}"
+			Start-ExecuteWithRetry -ScriptBlock {
+				Invoke-FastWebRequest -Uri "{{ .DownloadURL }}" -OutFile $downloadPath -Headers $DownloadTokenHeaders
+			} -MaxRetryCount 5 -RetryInterval 5 -RetryMessage "Retrying download of runner..."
+
+			mkdir $runnerDir
+			Update-GarmStatus -CallbackURL $CallbackURL -Message "extracting runner"
+			Add-Type -AssemblyName System.IO.Compression.FileSystem
+			[System.IO.Compression.ZipFile]::ExtractToDirectory($downloadPath, "$runnerDir")
+		} else {
+			Update-GarmStatus -CallbackURL $CallbackURL -Message "using cached runner found at $runnerDir"
 		}
-		$downloadPath = Join-Path $env:TMP {{.FileName}}
-		Invoke-FastWebRequest -Uri $DownloadURL -OutFile $downloadPath -Headers $DownloadTokenHeaders
-
-		$runnerDir = "C:\runner"
-		mkdir $runnerDir
-
-		Update-GarmStatus -CallbackURL $CallbackURL -Message "extracting runner"
-		Add-Type -AssemblyName System.IO.Compression.FileSystem
-		[System.IO.Compression.ZipFile]::ExtractToDirectory($downloadPath, "$runnerDir")
 
 		Update-GarmStatus -CallbackURL $CallbackURL -Message "configuring and starting runner"
 		cd $runnerDir
@@ -511,17 +527,20 @@ function Install-Runner() {
 
 		Update-GarmStatus -CallbackURL $CallbackURL -Message "Creating system service"
 		$SVC_NAME=(gc -raw $serviceNameFile)
-		New-Service -Name "$SVC_NAME" -BinaryPathName "C:\runner\bin\RunnerService.exe" -DisplayName "$SVC_NAME" -Description "GitHub Actions Runner ($SVC_NAME)" -StartupType Automatic
+		New-Service -Name "$SVC_NAME" -BinaryPathName "C:\actions-runner\bin\RunnerService.exe" -DisplayName "$SVC_NAME" -Description "GitHub Actions Runner ($SVC_NAME)" -StartupType Automatic
 		Start-Service "$SVC_NAME"
 		Set-SystemInfo -CallbackURL $CallbackURL -RunnerDir $runnerDir -BearerToken $Token
 		Update-GarmStatus -Message "runner successfully installed" -CallbackURL $CallbackURL -Status "idle" | Out-Null
 
 		{{- else }}
-		$GithubRegistrationToken = Invoke-WebRequest -UseBasicParsing -Headers @{"Accept"="application/json"; "Authorization"="Bearer $Token"} -Uri $MetadataURL/runner-registration-token/
+		# Fetch GitHub runner registration token with retry
+		$GithubRegistrationToken = Start-ExecuteWithRetry -ScriptBlock {
+			Invoke-WebRequest -UseBasicParsing -Headers @{"Accept"="application/json"; "Authorization"="Bearer $Token"} -Uri $MetadataURL/runner-registration-token/
+		} -MaxRetryCount 5 -RetryInterval 5 -RetryMessage "Retrying download of GitHub registration token..."
 		{{- if .GitHubRunnerGroup }}
-		./config.cmd --unattended --url "{{ .RepoURL }}" --token $GithubRegistrationToken --runnergroup {{.GitHubRunnerGroup}} --name "{{ .RunnerName }}" --labels "{{ .RunnerLabels }}" --ephemeral --runasservice
+		./config.cmd --unattended --url "{{ .RepoURL }}" --token $GithubRegistrationToken --runnergroup {{.GitHubRunnerGroup}} --name "{{ .RunnerName }}" --labels "{{ .RunnerLabels }}" --no-default-labels --ephemeral --runasservice
 		{{- else}}
-		./config.cmd --unattended --url "{{ .RepoURL }}" --token $GithubRegistrationToken --name "{{ .RunnerName }}" --labels "{{ .RunnerLabels }}" --ephemeral --runasservice
+		./config.cmd --unattended --url "{{ .RepoURL }}" --token $GithubRegistrationToken --name "{{ .RunnerName }}" --labels "{{ .RunnerLabels }}" --no-default-labels --ephemeral --runasservice
 		{{- end}}
 
 		$agentInfoFile = Join-Path $runnerDir ".runner"

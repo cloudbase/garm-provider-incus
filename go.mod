@@ -6,7 +6,7 @@ toolchain go1.22.3
 
 require (
 	github.com/BurntSushi/toml v1.3.2
-	github.com/cloudbase/garm-provider-common v0.1.4-0.20240912084949-899c120c80ce
+	github.com/cloudbase/garm-provider-common v0.1.4-0.20241026163040-5b7633dfb896
 	github.com/gorilla/websocket v1.5.4-0.20240702125206-a62d9d2a8413
 	github.com/invopop/jsonschema v0.12.0
 	github.com/juju/clock v1.0.3
