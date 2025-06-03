@@ -89,7 +89,7 @@ function downloadAndExtractRunner() {
 	mkdir -p "$RUN_HOME" || fail "failed to create actions-runner folder"
 	sendStatus "extracting runner"
 	tar xf "/home/{{ .RunnerUsername }}/{{ .FileName }}" -C "$RUN_HOME"/ || fail "failed to extract runner"
-	# chown {{ .RunnerUsername }}:{{ .RunnerGroup }} -R "$RUN_HOME"/ || fail "failed to change owner"
+	chown {{ .RunnerUsername }}:{{ .RunnerGroup }} -R "$RUN_HOME"/ || fail "failed to change owner"
 }
 
 if [ ! -d "$RUN_HOME" ];then
@@ -132,7 +132,8 @@ fi
 
 sendStatus "enabling runner service"
 cp "$RUN_HOME"/bin/runsvc.sh "$RUN_HOME"/ || fail "failed to copy runsvc.sh"
-sudo chown {{ .RunnerUsername }}:{{ .RunnerGroup }} -R /home/{{ .RunnerUsername }} || fail "failed to change owner"
+# Chown is not needed for the cached runner
+# sudo chown {{ .RunnerUsername }}:{{ .RunnerGroup }} -R /home/{{ .RunnerUsername }} || fail "failed to change owner"
 sudo systemctl daemon-reload || fail "failed to reload systemd"
 sudo systemctl enable $SVC_NAME
 {{- else}}
@@ -182,6 +183,11 @@ fi
 
 AGENT_ID=""
 {{- if .UseJITConfig }}
+if [ -f "$RUN_HOME/env.sh" ];then
+	pushd $RUN_HOME
+	source env.sh
+	popd
+fi
 sudo systemctl start $SVC_NAME || fail "failed to start service"
 {{- else}}
 sendStatus "starting service"
