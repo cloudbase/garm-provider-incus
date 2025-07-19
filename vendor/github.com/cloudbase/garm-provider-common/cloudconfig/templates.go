@@ -261,6 +261,127 @@ function Start-ExecuteWithRetry {
     }
 }
 
+function Get-RandomString {
+    [CmdletBinding()]
+    Param(
+        [int]$Length=13
+    )
+    PROCESS {
+        if($Length -lt 6) {
+            $Length = 6
+        }
+        $special = @(44, 45, 46, 64)
+        $numeric = 48..57
+        $upper = 65..90
+        $lower = 97..122
+
+        $passwd = [System.Collections.Generic.List[object]](New-object "System.Collections.Generic.List[object]")
+        for($i=0; $i -lt $Length-4; $i++){
+            $c = get-random -input ($special + $numeric + $upper + $lower)
+            $passwd.Add([char]$c)
+        }
+
+        $passwd.Add([char](get-random -input $numeric))
+        $passwd.Add([char](get-random -input $special))
+        $passwd.Add([char](get-random -input $upper))
+        $passwd.Add([char](get-random -input $lower))
+
+        $Random = New-Object Random
+        return [string]::join("",($passwd|Sort-Object {$Random.Next()}))
+    }
+}
+
+Add-Type -TypeDefinition @"
+using System;
+using System.Runtime.InteropServices;
+using System.Text;
+
+public class GrantSysPrivileges
+{
+    [StructLayout(LayoutKind.Sequential)]
+    public struct LSA_UNICODE_STRING
+    {
+        public ushort Length;
+        public ushort MaximumLength;
+        public IntPtr Buffer;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct LSA_OBJECT_ATTRIBUTES
+    {
+        public int Length;
+        public IntPtr RootDirectory;
+        public IntPtr ObjectName;
+        public uint Attributes;
+        public IntPtr SecurityDescriptor;
+        public IntPtr SecurityQualityOfService;
+    }
+
+    [DllImport("advapi32.dll", SetLastError=true)]
+    public static extern uint LsaOpenPolicy(
+        ref LSA_UNICODE_STRING SystemName,
+        ref LSA_OBJECT_ATTRIBUTES ObjectAttributes,
+        uint DesiredAccess,
+        out IntPtr PolicyHandle
+    );
+
+    [DllImport("advapi32.dll", SetLastError=true)]
+    public static extern uint LsaAddAccountRights(
+        IntPtr PolicyHandle,
+        IntPtr AccountSid,
+        LSA_UNICODE_STRING[] UserRights,
+        uint CountOfRights
+    );
+
+    [DllImport("advapi32.dll")]
+    public static extern uint LsaClose(IntPtr PolicyHandle);
+
+    [DllImport("advapi32.dll")]
+    public static extern uint LsaNtStatusToWinError(uint status);
+
+    public const uint POLICY_ALL_ACCESS = 0x00F0FFF;
+
+    public static uint GrantPrivilege(byte[] sid, string[] rights)
+    {
+        LSA_OBJECT_ATTRIBUTES loa = new LSA_OBJECT_ATTRIBUTES();
+        LSA_UNICODE_STRING systemName = new LSA_UNICODE_STRING();
+
+        IntPtr policyHandle;
+        uint result = LsaOpenPolicy(ref systemName, ref loa, POLICY_ALL_ACCESS, out policyHandle);
+        if (result != 0)
+        {
+            return LsaNtStatusToWinError(result);
+        }
+
+        LSA_UNICODE_STRING[] userRights = new LSA_UNICODE_STRING[rights.Length];
+        for (int i = 0; i < rights.Length; i++)
+        {
+            byte[] bytes = Encoding.Unicode.GetBytes(rights[i]);
+            IntPtr ptr = Marshal.AllocHGlobal(bytes.Length);
+            Marshal.Copy(bytes, 0, ptr, bytes.Length);
+
+            userRights[i].Buffer = ptr;
+            userRights[i].Length = (ushort)bytes.Length;
+            userRights[i].MaximumLength = (ushort)(bytes.Length);
+        }
+
+        IntPtr sidPtr = Marshal.AllocHGlobal(sid.Length);
+        Marshal.Copy(sid, 0, sidPtr, sid.Length);
+
+        result = LsaAddAccountRights(policyHandle, sidPtr, userRights, (uint)rights.Length);
+        LsaClose(policyHandle);
+
+        foreach (var right in userRights)
+        {
+            Marshal.FreeHGlobal(right.Buffer);
+        }
+        Marshal.FreeHGlobal(sidPtr);
+
+        return LsaNtStatusToWinError(result);
+    }
+}
+"@ -Language CSharp
+
 function Invoke-FastWebRequest {
 	[CmdletBinding()]
 	Param(
@@ -480,6 +601,26 @@ function Install-Runner() {
 			Throw "missing metadata URL"
 		}
 
+		# Create user with administrator rights to run service as
+		$userPasswd = Get-RandomString -Length 10
+		$secPasswd = ConvertTo-SecureString "$userPasswd" -AsPlainText -Force
+		New-LocalUser -Name "runner" -Password $secPasswd -PasswordNeverExpires -UserMayNotChangePassword
+		$pscreds = New-Object System.Management.Automation.PSCredential (".\runner", $secPasswd)
+		$adminGrpName = (Get-CimInstance win32_group -Filter 'SID = "S-1-5-32-544"').Name
+		if (!$adminGrpName) {
+			Throw "Could not find administrators group name"
+		}
+		Add-LocalGroupMember -Group $adminGrpName -Member runner
+		$ntAcct = New-Object System.Security.Principal.NTAccount("runner")
+		$sid = $ntAcct.Translate([System.Security.Principal.SecurityIdentifier])
+		$sidBytes = New-Object byte[] ($sid.BinaryLength)
+		$sid.GetBinaryForm($sidBytes, 0)
+
+		$result = [GrantSysPrivileges]::GrantPrivilege($sidBytes, ("SeBatchLogonRight", "SeServiceLogonRight"))
+		if ($result -ne 0) {
+		    Throw "Failed to grant privileges"
+		}
+
 		$bundle = wget -UseBasicParsing -Headers @{"Accept"="application/json"; "Authorization"="Bearer $Token"} -Uri $MetadataURL/system/cert-bundle
 		$converted = ConvertFrom-Json $bundle
 		foreach ($i in $converted.root_certificates.psobject.Properties){
@@ -514,6 +655,13 @@ function Install-Runner() {
 			Update-GarmStatus -CallbackURL $CallbackURL -Message "using cached runner found at $runnerDir"
 		}
 
+		# Ensure runner has full access to actions-runner folder
+		$runnerACL = Get-Acl $runnerDir
+		$runnerACL.SetAccessRule((New-Object System.Security.AccessControl.FileSystemAccessRule(
+		    "runner", "FullControl", "ContainerInherit,ObjectInherit", "None", "Allow"
+		)))
+		Set-Acl -Path $runnerDir -AclObject $runnerAcl
+
 		Update-GarmStatus -CallbackURL $CallbackURL -Message "configuring and starting runner"
 		cd $runnerDir
 
@@ -533,22 +681,23 @@ function Install-Runner() {
 
 		Update-GarmStatus -CallbackURL $CallbackURL -Message "Creating system service"
 		$SVC_NAME=(gc -raw $serviceNameFile)
-		New-Service -Name "$SVC_NAME" -BinaryPathName "C:\actions-runner\bin\RunnerService.exe" -DisplayName "$SVC_NAME" -Description "GitHub Actions Runner ($SVC_NAME)" -StartupType Automatic
+		New-Service -Name "$SVC_NAME" -BinaryPathName "C:\actions-runner\bin\RunnerService.exe" -DisplayName "$SVC_NAME" -Description "GitHub Actions Runner ($SVC_NAME)" -StartupType Automatic -Credential $pscreds
 		Start-Service "$SVC_NAME"
 		Set-SystemInfo -CallbackURL $CallbackURL -RunnerDir $runnerDir -BearerToken $Token
 		Update-GarmStatus -Message "runner successfully installed" -CallbackURL $CallbackURL -Status "idle" | Out-Null
 
 		{{- else }}
-		# Fetch GitHub runner registration token with retry
 		$GithubRegistrationToken = Start-ExecuteWithRetry -ScriptBlock {
 			Invoke-WebRequest -UseBasicParsing -Headers @{"Accept"="application/json"; "Authorization"="Bearer $Token"} -Uri $MetadataURL/runner-registration-token/
 		} -MaxRetryCount 5 -RetryInterval 5 -RetryMessage "Retrying download of GitHub registration token..."
 		{{- if .GitHubRunnerGroup }}
-		./config.cmd --unattended --url "{{ .RepoURL }}" --token $GithubRegistrationToken --runnergroup {{.GitHubRunnerGroup}} --name "{{ .RunnerName }}" --labels "{{ .RunnerLabels }}" --no-default-labels --ephemeral --runasservice
+		./config.cmd --unattended --url "{{ .RepoURL }}" --token $GithubRegistrationToken --runnergroup {{.GitHubRunnerGroup}} --name "{{ .RunnerName }}" --labels "{{ .RunnerLabels }}" --no-default-labels --ephemeral --runasservice --windowslogonaccount runner --windowslogonpassword "$userPasswd"
 		{{- else}}
-		./config.cmd --unattended --url "{{ .RepoURL }}" --token $GithubRegistrationToken --name "{{ .RunnerName }}" --labels "{{ .RunnerLabels }}" --no-default-labels --ephemeral --runasservice
+		./config.cmd --unattended --url "{{ .RepoURL }}" --token $GithubRegistrationToken --name "{{ .RunnerName }}" --labels "{{ .RunnerLabels }}" --no-default-labels --ephemeral --runasservice --windowslogonaccount runner --windowslogonpassword "$userPasswd"
 		{{- end}}
-
+		if ($LASTEXITCODE) {
+			Throw "Failed to configure runner. Err code $LASTEXITCODE"
+		}
 		$agentInfoFile = Join-Path $runnerDir ".runner"
 		$agentInfo = ConvertFrom-Json (gc -raw $agentInfoFile)
 		Set-SystemInfo -CallbackURL $CallbackURL -RunnerDir $runnerDir -BearerToken $Token
