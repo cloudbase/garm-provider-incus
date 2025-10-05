@@ -604,14 +604,19 @@ function Install-Runner() {
 		# Create user with administrator rights to run service as
 		$userPasswd = Get-RandomString -Length 10
 		$secPasswd = ConvertTo-SecureString "$userPasswd" -AsPlainText -Force
-		New-LocalUser -Name "runner" -Password $secPasswd -PasswordNeverExpires -UserMayNotChangePassword
-		$pscreds = New-Object System.Management.Automation.PSCredential (".\runner", $secPasswd)
-		$adminGrpName = (Get-CimInstance win32_group -Filter 'SID = "S-1-5-32-544"').Name
-		if (!$adminGrpName) {
-			Throw "Could not find administrators group name"
+		$userName = "runner"
+		$user = Get-LocalUser -Name $userName -ErrorAction SilentlyContinue
+		if (-not $user) {
+			New-LocalUser -Name $userName -Password $secPasswd -PasswordNeverExpires -UserMayNotChangePassword
+		} else {
+			Set-LocalUser -PasswordNeverExpires $true -Name $userName -Password $secPasswd
 		}
-		Add-LocalGroupMember -Group $adminGrpName -Member runner
-		$ntAcct = New-Object System.Security.Principal.NTAccount("runner")
+		$pscreds = New-Object System.Management.Automation.PSCredential (".\$userName", $secPasswd)
+		$hasUser = Get-LocalGroupMember -SID S-1-5-32-544 -Member $userName -ErrorAction SilentlyContinue
+		if (-not $hasUser){
+			Add-LocalGroupMember -SID S-1-5-32-544 -Member $userName
+		}
+		$ntAcct = New-Object System.Security.Principal.NTAccount($userName)
 		$sid = $ntAcct.Translate([System.Security.Principal.SecurityIdentifier])
 		$sidBytes = New-Object byte[] ($sid.BinaryLength)
 		$sid.GetBinaryForm($sidBytes, 0)
@@ -658,7 +663,7 @@ function Install-Runner() {
 		# Ensure runner has full access to actions-runner folder
 		$runnerACL = Get-Acl $runnerDir
 		$runnerACL.SetAccessRule((New-Object System.Security.AccessControl.FileSystemAccessRule(
-		    "runner", "FullControl", "ContainerInherit,ObjectInherit", "None", "Allow"
+		    $userName, "FullControl", "ContainerInherit,ObjectInherit", "None", "Allow"
 		)))
 		Set-Acl -Path $runnerDir -AclObject $runnerAcl
 
@@ -691,9 +696,9 @@ function Install-Runner() {
 			Invoke-WebRequest -UseBasicParsing -Headers @{"Accept"="application/json"; "Authorization"="Bearer $Token"} -Uri $MetadataURL/runner-registration-token/
 		} -MaxRetryCount 5 -RetryInterval 5 -RetryMessage "Retrying download of GitHub registration token..."
 		{{- if .GitHubRunnerGroup }}
-		./config.cmd --unattended --url "{{ .RepoURL }}" --token $GithubRegistrationToken --runnergroup {{.GitHubRunnerGroup}} --name "{{ .RunnerName }}" --labels "{{ .RunnerLabels }}" --no-default-labels --ephemeral --runasservice --windowslogonaccount runner --windowslogonpassword "$userPasswd"
+		./config.cmd --unattended --url "{{ .RepoURL }}" --token $GithubRegistrationToken --runnergroup {{.GitHubRunnerGroup}} --name "{{ .RunnerName }}" --labels "{{ .RunnerLabels }}" --no-default-labels --ephemeral --runasservice --windowslogonaccount "$userName" --windowslogonpassword "$userPasswd"
 		{{- else}}
-		./config.cmd --unattended --url "{{ .RepoURL }}" --token $GithubRegistrationToken --name "{{ .RunnerName }}" --labels "{{ .RunnerLabels }}" --no-default-labels --ephemeral --runasservice --windowslogonaccount runner --windowslogonpassword "$userPasswd"
+		./config.cmd --unattended --url "{{ .RepoURL }}" --token $GithubRegistrationToken --name "{{ .RunnerName }}" --labels "{{ .RunnerLabels }}" --no-default-labels --ephemeral --runasservice --windowslogonaccount "$userName" --windowslogonpassword "$userPasswd"
 		{{- end}}
 		if ($LASTEXITCODE) {
 			Throw "Failed to configure runner. Err code $LASTEXITCODE"
