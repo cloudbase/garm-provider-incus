@@ -33,11 +33,12 @@ var testCases = []struct {
 }{
 	{
 		name:  "full specs",
-		input: json.RawMessage(`{"disable_updates": true, "extra_packages": ["package1", "package2"], "enable_boot_debug": true, "runner_install_template": "IyEvYmluL2Jhc2gKZWNobyBJbnN0YWxsaW5nIHJ1bm5lci4uLg==", "pre_install_scripts": {"setup.sh": "IyEvYmluL2Jhc2gKZWNobyBTZXR1cCBzY3JpcHQuLi4="}, "extra_context": {"key": "value"}}`),
+		input: json.RawMessage(`{"use_lowercase_hostnames": false, "disable_updates": true, "extra_packages": ["package1", "package2"], "enable_boot_debug": true, "runner_install_template": "IyEvYmluL2Jhc2gKZWNobyBJbnN0YWxsaW5nIHJ1bm5lci4uLg==", "pre_install_scripts": {"setup.sh": "IyEvYmluL2Jhc2gKZWNobyBTZXR1cCBzY3JpcHQuLi4="}, "extra_context": {"key": "value"}}`),
 		expectedOutput: extraSpecs{
-			DisableUpdates:  true,
-			ExtraPackages:   []string{"package1", "package2"},
-			EnableBootDebug: true,
+			DisableUpdates:        true,
+			ExtraPackages:         []string{"package1", "package2"},
+			EnableBootDebug:       true,
+			UseLowerCaseHostnames: false,
 			CloudConfigSpec: cloudconfig.CloudConfigSpec{
 				RunnerInstallTemplate: []byte("#!/bin/bash\necho Installing runner..."),
 				PreInstallScripts: map[string][]byte{

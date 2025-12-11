@@ -18,6 +18,7 @@ package provider
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -53,6 +54,9 @@ const (
 	// architecture a runner is supposed to have. This value is defined in the pool and
 	// passed into the provider as bootstrap params.
 	osArchKeyNAme = "user.os-arch"
+
+	// runnerInstanceName is the ID of the runner in GRAM.
+	runnerInstanceKeyName = "user.runner-name"
 )
 
 var (
@@ -230,15 +234,21 @@ func (l *Incus) getCreateInstanceArgs(ctx context.Context, bootstrapParams commo
 	}
 
 	configMap := map[string]string{
-		"user.user-data":    cloudCfg,
-		osTypeKeyName:       string(bootstrapParams.OSType),
-		osArchKeyNAme:       string(bootstrapParams.OSArch),
-		controllerIDKeyName: l.controllerID,
-		poolIDKey:           bootstrapParams.PoolID,
+		"user.user-data":      cloudCfg,
+		osTypeKeyName:         string(bootstrapParams.OSType),
+		osArchKeyNAme:         string(bootstrapParams.OSArch),
+		controllerIDKeyName:   l.controllerID,
+		poolIDKey:             bootstrapParams.PoolID,
+		runnerInstanceKeyName: bootstrapParams.Name,
 	}
 
 	if instanceType == config.IncusImageVirtualMachine {
 		configMap["security.secureboot"] = l.secureBootEnabled()
+	}
+
+	instanceName := bootstrapParams.Name
+	if specs.UseLowerCaseHostnames {
+		instanceName = strings.ToLower(instanceName)
 	}
 
 	args := api.InstancesPost{
@@ -249,7 +259,7 @@ func (l *Incus) getCreateInstanceArgs(ctx context.Context, bootstrapParams commo
 			Config:       configMap,
 		},
 		Source: instanceSource,
-		Name:   bootstrapParams.Name,
+		Name:   instanceName,
 		Type:   api.InstanceType(instanceType),
 	}
 	return args, nil
@@ -321,6 +331,16 @@ func (l *Incus) GetInstance(ctx context.Context, instanceName string) (commonPar
 		return commonParams.ProviderInstance{}, errors.Wrap(err, "fetching client")
 	}
 	instance, _, err := cli.GetInstanceFull(instanceName)
+	if err == nil {
+		return incusInstanceToAPIInstance(instance), nil
+	}
+
+	if !isNotFoundError(err) {
+		return commonParams.ProviderInstance{}, errors.Wrap(err, "fetching instance")
+	}
+
+	asLower := strings.ToLower(instanceName)
+	instance, _, err = cli.GetInstanceFull(asLower)
 	if err != nil {
 		if isNotFoundError(err) {
 			return commonParams.ProviderInstance{}, errors.Wrapf(runnerErrors.ErrNotFound, "fetching instance: %q", err)
