@@ -118,9 +118,6 @@ type Incus struct {
 
 	// InstanceType allows you to choose between a virtual machine and a container
 	InstanceType IncusImageType `toml:"instance_type" json:"instance-type"`
-
-	// UseLowerCaseHostnames makes the runner name all lowercase before sending it to incus.
-	UseLowerCaseHostnames bool `toml:"use_lowercase_hostnames" json:"use_lowercase_hostnames"`
 }
 
 func (l *Incus) GetInstanceType() IncusImageType {

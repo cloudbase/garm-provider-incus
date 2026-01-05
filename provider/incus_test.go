@@ -17,7 +17,6 @@ package provider
 
 import (
 	"context"
-	"encoding/json"
 	"testing"
 
 	commonParams "github.com/cloudbase/garm-provider-common/params"
@@ -185,12 +184,11 @@ func TestGetCreateInstanceArgsContainer(t *testing.T) {
 					Profiles:     []string{"default", "container"},
 					Description:  "Github runner provisioned by garm",
 					Config: map[string]string{
-						"user.user-data":      `#cloud-config`,
-						osTypeKeyName:         "linux",
-						osArchKeyNAme:         "amd64",
-						controllerIDKeyName:   "controller",
-						poolIDKey:             "default",
-						runnerInstanceKeyName: "test-instance",
+						"user.user-data":    `#cloud-config`,
+						osTypeKeyName:       "linux",
+						osArchKeyNAme:       "amd64",
+						controllerIDKeyName: "controller",
+						poolIDKey:           "default",
 					},
 				},
 				Source: api.InstanceSource{
@@ -261,6 +259,7 @@ func TestGetCreateInstanceArgsVM(t *testing.T) {
 	cli.On("GetImageAliasArchitectures", config.IncusImageType("virtual-machine").String(), "windows").Return(aliases, nil)
 	cli.On("GetImage", aliases["x86_64"].Target).Return(&api.Image{Fingerprint: "123abc"}, "", nil)
 	cli.On("GetProfileNames").Return([]string{"default", "virtual-machine"}, nil)
+	specs := extraSpecs{}
 	tests := []struct {
 		name            string
 		bootstrapParams commonParams.BootstrapInstance
@@ -276,7 +275,7 @@ func TestGetCreateInstanceArgsVM(t *testing.T) {
 		{
 			name: "success vm instance",
 			bootstrapParams: commonParams.BootstrapInstance{
-				Name:    "test-InStAnCe",
+				Name:    "test-instance",
 				Tools:   tools,
 				Image:   "windows",
 				Flavor:  "virtual-machine",
@@ -284,43 +283,6 @@ func TestGetCreateInstanceArgsVM(t *testing.T) {
 				PoolID:  "default",
 				OSArch:  commonParams.Amd64,
 				OSType:  commonParams.Windows,
-			},
-			expected: api.InstancesPost{
-				Name: "test-InStAnCe",
-				InstancePut: api.InstancePut{
-					Architecture: "x86_64",
-					Profiles:     []string{"default", "virtual-machine"},
-					Description:  "Github runner provisioned by garm",
-					Config: map[string]string{
-						"user.user-data":      "#ps1_sysnative\n" + "#cloud-config",
-						osTypeKeyName:         "windows",
-						osArchKeyNAme:         "amd64",
-						controllerIDKeyName:   "controller",
-						poolIDKey:             "default",
-						runnerInstanceKeyName: "test-InStAnCe",
-						"security.secureboot": "false",
-					},
-				},
-				Source: api.InstanceSource{
-					Type:        "image",
-					Fingerprint: "123abc",
-				},
-				Type: "virtual-machine",
-			},
-			errString: "",
-		},
-		{
-			name: "success vm instance with lower case name",
-			bootstrapParams: commonParams.BootstrapInstance{
-				Name:       "test-InStAnCe",
-				Tools:      tools,
-				Image:      "windows",
-				Flavor:     "virtual-machine",
-				RepoURL:    "mock-repo-url",
-				PoolID:     "default",
-				OSArch:     commonParams.Amd64,
-				OSType:     commonParams.Windows,
-				ExtraSpecs: json.RawMessage(`{"use_lowercase_hostnames": true}`),
 			},
 			expected: api.InstancesPost{
 				Name: "test-instance",
@@ -334,7 +296,6 @@ func TestGetCreateInstanceArgsVM(t *testing.T) {
 						osArchKeyNAme:         "amd64",
 						controllerIDKeyName:   "controller",
 						poolIDKey:             "default",
-						runnerInstanceKeyName: "test-InStAnCe",
 						"security.secureboot": "false",
 					},
 				},
@@ -350,9 +311,6 @@ func TestGetCreateInstanceArgsVM(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			specs, err := parseExtraSpecsFromBootstrapParams(tt.bootstrapParams)
-			require.NoError(t, err)
-
 			ret, err := l.getCreateInstanceArgs(ctx, tt.bootstrapParams, specs)
 			if tt.errString != "" {
 				require.Error(t, err)
