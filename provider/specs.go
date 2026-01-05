@@ -26,10 +26,9 @@ import (
 )
 
 type extraSpecs struct {
-	ExtraPackages         []string `json:"extra_packages,omitempty" jsonschema:"description=A list of packages that cloud-init should install on the instance."`
-	DisableUpdates        bool     `json:"disable_updates,omitempty" jsonschema:"description=Whether to disable updates when cloud-init comes online."`
-	EnableBootDebug       bool     `json:"enable_boot_debug,omitempty" jsonschema:"description=Allows providers to set the -x flag in the runner install script."`
-	UseLowerCaseHostnames bool     `json:"use_lowercase_hostnames,omitempty" jsonschema:"description=Instructs the provider to make the hostname of the runner all lowercase."`
+	ExtraPackages   []string `json:"extra_packages,omitempty" jsonschema:"description=A list of packages that cloud-init should install on the instance."`
+	DisableUpdates  bool     `json:"disable_updates,omitempty" jsonschema:"description=Whether to disable updates when cloud-init comes online."`
+	EnableBootDebug bool     `json:"enable_boot_debug,omitempty" jsonschema:"description=Allows providers to set the -x flag in the runner install script."`
 	cloudconfig.CloudConfigSpec
 }
 

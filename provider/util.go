@@ -66,15 +66,12 @@ func incusInstanceToAPIInstance(instance *api.InstanceFull) commonParams.Provide
 	incusOS := instance.ExpandedConfig["image.os"]
 
 	osType, _ := util.OSToOSType(incusOS)
+
 	if osType == "" {
 		osTypeFromTag := instance.ExpandedConfig[osTypeKeyName]
 		osType = commonParams.OSType(osTypeFromTag)
 	}
 	osRelease := instance.ExpandedConfig["image.release"]
-	runnerName := instance.Name
-	if instance.ExpandedConfig[runnerInstanceKeyName] != "" {
-		runnerName = instance.ExpandedConfig[runnerInstanceKeyName]
-	}
 
 	state := instance.State
 	addresses := []commonParams.Address{}
@@ -96,7 +93,7 @@ func incusInstanceToAPIInstance(instance *api.InstanceFull) commonParams.Provide
 	return commonParams.ProviderInstance{
 		OSArch:     instanceArch,
 		ProviderID: instance.Name,
-		Name:       runnerName,
+		Name:       instance.Name,
 		OSType:     osType,
 		OSName:     strings.ToLower(incusOS),
 		OSVersion:  osRelease,
