@@ -17,7 +17,7 @@ cd garm-provider-incus
 go build .
 ```
 
-Copy the binary on the same system where ```garm``` is running, and [point to it in the config](https://github.com/cloudbase/garm/blob/main/doc/providers.md#the-external-provider).
+Copy the binary on the same system where ```garm``` is running, and [point to it in the config](https://github.com/cloudbase/garm/blob/main/doc/config.md#provider-configuration).
 
 ## Configure
 
