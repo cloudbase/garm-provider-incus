@@ -25,8 +25,8 @@ import (
 	execution "github.com/cloudbase/garm-provider-common/execution/v0.1.0"
 	"github.com/cloudbase/garm-provider-incus/config"
 
-	incus "github.com/lxc/incus/client"
-	"github.com/lxc/incus/shared/api"
+	incus "github.com/lxc/incus/v7/client"
+	"github.com/lxc/incus/v7/shared/api"
 	"github.com/pkg/errors"
 
 	"github.com/cloudbase/garm-provider-common/cloudconfig"
@@ -341,7 +341,7 @@ func (l *Incus) DeleteInstance(ctx context.Context, instance string) error {
 		// I am not proud of this, but the drivers.ErrInstanceIsStopped from Incus pulls in
 		// a ton of CGO, linux specific dependencies, that don't make sense having
 		// in garm.
-		if !(errors.Cause(err).Error() == errInstanceIsStopped.Error()) {
+		if errors.Cause(err).Error() != errInstanceIsStopped.Error() {
 			return errors.Wrap(err, "stopping instance")
 		}
 	}

@@ -19,8 +19,8 @@ import (
 	"context"
 
 	"github.com/gorilla/websocket"
-	incus "github.com/lxc/incus/client"
-	"github.com/lxc/incus/shared/api"
+	incus "github.com/lxc/incus/v7/client"
+	"github.com/lxc/incus/v7/shared/api"
 	"github.com/stretchr/testify/mock"
 )
 

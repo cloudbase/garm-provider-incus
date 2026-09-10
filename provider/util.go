@@ -33,14 +33,14 @@ import (
 	"github.com/invopop/jsonschema"
 	"github.com/juju/clock"
 	"github.com/juju/retry"
-	incus "github.com/lxc/incus/client"
-	"github.com/lxc/incus/shared/api"
+	incus "github.com/lxc/incus/v7/client"
+	"github.com/lxc/incus/v7/shared/api"
 	"github.com/pkg/errors"
 )
 
 var (
-	//lint:ignore ST1005 imported error from incus
-	errInstanceIsStopped error = fmt.Errorf("The instance is already stopped")
+	//nolint:staticcheck // ST1005: must match the error string returned by incus
+	errInstanceIsStopped = fmt.Errorf("The instance is already stopped")
 )
 
 var httpResponseErrors = map[int][]error{
@@ -194,7 +194,7 @@ func resolveArchitecture(osArch commonParams.OSArch) (string, error) {
 // device is active
 func (l *Incus) waitInstanceHasIP(ctx context.Context, instanceName string) (commonParams.ProviderInstance, error) {
 	var p commonParams.ProviderInstance
-	var errIPNotFound error = fmt.Errorf("ip not found")
+	errIPNotFound := fmt.Errorf("ip not found")
 	err := retry.Call(retry.CallArgs{
 		Func: func() error {
 			var err error

@@ -55,6 +55,6 @@ func main() {
 		os.Exit(commonExecution.ResolveErrorToExitCode(err))
 	}
 	if len(result) > 0 {
-		fmt.Fprint(os.Stdout, result)
+		fmt.Print(result)
 	}
 }
