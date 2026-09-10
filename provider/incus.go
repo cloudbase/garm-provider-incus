@@ -334,7 +334,7 @@ func (l *Incus) DeleteInstance(ctx context.Context, instance string) error {
 		return errors.Wrap(err, "fetching client")
 	}
 
-	if err := l.setState(ctx, instance, "stop", true); err != nil {
+	if err := l.stopForDelete(ctx, instance); err != nil {
 		if isNotFoundError(err) {
 			return nil
 		}
@@ -457,10 +457,31 @@ func (l *Incus) RemoveAllInstances(ctx context.Context) error {
 	return nil
 }
 
+// stopForDelete stops an instance that is about to be deleted. With a
+// graceful stop timeout configured, the guest is first asked to shut down so
+// it can release its DHCP lease and flush its disks; a guest that fails to
+// stop in time is then stopped forcefully, exactly as without the option.
+func (l *Incus) stopForDelete(ctx context.Context, instance string) error {
+	if l.cfg.GracefulStopTimeout > 0 {
+		err := l.setStateWithTimeout(ctx, instance, "stop", l.cfg.GracefulStopTimeout, false)
+		if err == nil || isNotFoundError(err) || errors.Cause(err).Error() == errInstanceIsStopped.Error() {
+			return err
+		}
+	}
+	return l.setState(ctx, instance, "stop", true)
+}
+
 func (l *Incus) setState(ctx context.Context, instance, state string, force bool) error {
+	return l.setStateWithTimeout(ctx, instance, state, -1, force)
+}
+
+// setStateWithTimeout requests a state change. timeout is the number of
+// seconds Incus gives the guest to comply before failing the operation; -1
+// waits indefinitely.
+func (l *Incus) setStateWithTimeout(ctx context.Context, instance, state string, timeout int, force bool) error {
 	reqState := api.InstanceStatePut{
 		Action:  state,
-		Timeout: -1,
+		Timeout: timeout,
 		Force:   force,
 	}
 
@@ -473,7 +494,11 @@ func (l *Incus) setState(ctx context.Context, instance, state string, force bool
 	if err != nil {
 		return errors.Wrapf(err, "setting state to %s", state)
 	}
-	ctxTimeout, cancel := context.WithTimeout(context.Background(), time.Second*60)
+	waitBudget := time.Second * 60
+	if timeout > 0 && time.Duration(timeout)*time.Second+time.Second*30 > waitBudget {
+		waitBudget = time.Duration(timeout)*time.Second + time.Second*30
+	}
+	ctxTimeout, cancel := context.WithTimeout(context.Background(), waitBudget)
 	defer cancel()
 	err = op.WaitContext(ctxTimeout)
 	if err != nil {

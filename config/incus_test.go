@@ -88,6 +88,15 @@ func TestIncusConfig(t *testing.T) {
 	require.Nil(t, err)
 }
 
+func TestIncusNegativeGracefulStopTimeout(t *testing.T) {
+	cfg := getDefaultIncusConfig()
+
+	cfg.GracefulStopTimeout = -1
+	err := cfg.Validate()
+	require.NotNil(t, err)
+	require.EqualError(t, err, "graceful_stop_timeout must not be negative")
+}
+
 func TestIncusWithInvalidUnixSocket(t *testing.T) {
 	cfg := getDefaultIncusConfig()
 

@@ -17,6 +17,7 @@ package provider
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	commonParams "github.com/cloudbase/garm-provider-common/params"
@@ -588,6 +589,82 @@ func TestDeleteInstance(t *testing.T) {
 
 	err := l.DeleteInstance(ctx, instanceName)
 	require.NoError(t, err)
+}
+
+func TestDeleteInstanceGracefulStop(t *testing.T) {
+	ctx := context.Background()
+	cli := new(MockIncusServer)
+	instanceName := "test-instance"
+	cfg := &config.Incus{
+		UnixSocket:            "/var/run/incus.sock",
+		InstanceType:          "container",
+		IncludeDefaultProfile: true,
+		GracefulStopTimeout:   15,
+	}
+	l := &Incus{
+		cfg:          cfg,
+		cli:          cli,
+		imageManager: &image{remotes: map[string]config.IncusImageRemote{}},
+		controllerID: "controller",
+	}
+	mockOp := new(MockOperation)
+	mockOp.On("WaitContext", mock.Anything).Return(nil)
+	cli.On("DeleteInstance", instanceName).Return(mockOp, nil)
+	// The orderly shutdown is requested with the configured timeout and no
+	// force; a forced stop must not follow when it succeeds.
+	cli.On("UpdateInstanceState", instanceName, api.InstanceStatePut{
+		Action:  "stop",
+		Timeout: 15,
+		Force:   false,
+	}, "").Return(mockOp, nil)
+
+	err := l.DeleteInstance(ctx, instanceName)
+	require.NoError(t, err)
+	cli.AssertNotCalled(t, "UpdateInstanceState", instanceName, api.InstanceStatePut{
+		Action:  "stop",
+		Timeout: -1,
+		Force:   true,
+	}, "")
+}
+
+func TestDeleteInstanceGracefulStopFallsBackToForce(t *testing.T) {
+	ctx := context.Background()
+	cli := new(MockIncusServer)
+	instanceName := "test-instance"
+	cfg := &config.Incus{
+		UnixSocket:            "/var/run/incus.sock",
+		InstanceType:          "container",
+		IncludeDefaultProfile: true,
+		GracefulStopTimeout:   15,
+	}
+	l := &Incus{
+		cfg:          cfg,
+		cli:          cli,
+		imageManager: &image{remotes: map[string]config.IncusImageRemote{}},
+		controllerID: "controller",
+	}
+	mockOp := new(MockOperation)
+	mockOp.On("WaitContext", mock.Anything).Return(nil)
+	cli.On("DeleteInstance", instanceName).Return(mockOp, nil)
+	// A guest that ignores the shutdown request fails the stop operation on
+	// the Incus side once the timeout elapses; the forced stop must still
+	// happen so the delete proceeds as before.
+	timedOutOp := new(MockOperation)
+	timedOutOp.On("WaitContext", mock.Anything).Return(fmt.Errorf("Failed shutting down instance: timed out"))
+	cli.On("UpdateInstanceState", instanceName, api.InstanceStatePut{
+		Action:  "stop",
+		Timeout: 15,
+		Force:   false,
+	}, "").Return(timedOutOp, nil)
+	cli.On("UpdateInstanceState", instanceName, api.InstanceStatePut{
+		Action:  "stop",
+		Timeout: -1,
+		Force:   true,
+	}, "").Return(mockOp, nil)
+
+	err := l.DeleteInstance(ctx, instanceName)
+	require.NoError(t, err)
+	cli.AssertExpectations(t)
 }
 
 func TestListInstances(t *testing.T) {

@@ -19,6 +19,12 @@ instance_type = "container"
 # enable/disable secure boot. If the image you select for the pool does not have a
 # signed bootloader, set this to false, otherwise your instances won't boot.
 secure_boot = false
+# graceful_stop_timeout is the number of seconds to wait for an orderly guest
+# shutdown before an instance is force-stopped for deletion. An orderly shutdown
+# lets the guest release its DHCP lease and flush its disks; with the default of
+# 0 the instance is force-stopped immediately and its lease stays allocated
+# until it expires.
+graceful_stop_timeout = 0
 # Project name to use. You can create a separate project in Incus for runners.
 project_name = "default"
 # URL is the address on which Incus listens for connections (ex: https://example.com:8443)

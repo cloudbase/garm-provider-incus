@@ -118,6 +118,14 @@ type Incus struct {
 
 	// InstanceType allows you to choose between a virtual machine and a container
 	InstanceType IncusImageType `toml:"instance_type" json:"instance-type"`
+
+	// GracefulStopTimeout is the number of seconds DeleteInstance waits for an
+	// orderly guest shutdown before falling back to a forced stop. An orderly
+	// shutdown lets the guest release its DHCP lease and flush its disks; a
+	// forced stop leaves the lease held until it expires, which exhausts small
+	// DHCP pools under high runner churn. 0 (the default) keeps the forced
+	// stop.
+	GracefulStopTimeout int `toml:"graceful_stop_timeout" json:"graceful-stop-timeout"`
 }
 
 func (l *Incus) GetInstanceType() IncusImageType {
@@ -130,6 +138,10 @@ func (l *Incus) GetInstanceType() IncusImageType {
 }
 
 func (l *Incus) Validate() error {
+	if l.GracefulStopTimeout < 0 {
+		return fmt.Errorf("graceful_stop_timeout must not be negative")
+	}
+
 	if l.UnixSocket != "" {
 		if _, err := os.Stat(l.UnixSocket); err != nil {
 			return fmt.Errorf("could not access unix socket %s: %w", l.UnixSocket, err)
