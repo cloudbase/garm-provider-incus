@@ -22,7 +22,7 @@ import (
 	runnerErrors "github.com/cloudbase/garm-provider-common/errors"
 	"github.com/cloudbase/garm-provider-incus/config"
 
-	"github.com/lxc/incus/shared/api"
+	"github.com/lxc/incus/v7/shared/api"
 	"github.com/pkg/errors"
 )
 

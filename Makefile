@@ -30,7 +30,7 @@ build-static:
 test: install-lint-deps verify go-test
 
 install-lint-deps:
-	@$(GO) install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+	@$(GO) install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest
 
 lint:
 	@golangci-lint run --timeout=8m --build-tags testing
