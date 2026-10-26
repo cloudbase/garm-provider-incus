@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"time"
 
 	"github.com/BurntSushi/toml"
 	"github.com/pkg/errors"
@@ -126,6 +127,24 @@ type Incus struct {
 	// DHCP pools under high runner churn. 0 (the default) keeps the forced
 	// stop.
 	GracefulStopTimeout int `toml:"graceful_stop_timeout" json:"graceful-stop-timeout"`
+
+	// IPWaitTimeout is the number of seconds CreateInstance waits for a new
+	// instance to report an IPv4 address. For virtual machines Incus records
+	// the address only once the in-guest agent is up, which on a loaded host
+	// can take longer than the default. 0 (the default) keeps 100 seconds.
+	IPWaitTimeout int `toml:"ip_wait_timeout" json:"ip-wait-timeout"`
+}
+
+// DefaultIPWaitTimeout is how long CreateInstance waits for an IPv4 address
+// when ip_wait_timeout is unset.
+const DefaultIPWaitTimeout = 100 * time.Second
+
+// GetIPWaitTimeout returns how long CreateInstance waits for an IPv4 address.
+func (l *Incus) GetIPWaitTimeout() time.Duration {
+	if l.IPWaitTimeout <= 0 {
+		return DefaultIPWaitTimeout
+	}
+	return time.Duration(l.IPWaitTimeout) * time.Second
 }
 
 func (l *Incus) GetInstanceType() IncusImageType {
@@ -140,6 +159,10 @@ func (l *Incus) GetInstanceType() IncusImageType {
 func (l *Incus) Validate() error {
 	if l.GracefulStopTimeout < 0 {
 		return fmt.Errorf("graceful_stop_timeout must not be negative")
+	}
+
+	if l.IPWaitTimeout < 0 {
+		return fmt.Errorf("ip_wait_timeout must not be negative")
 	}
 
 	if l.UnixSocket != "" {

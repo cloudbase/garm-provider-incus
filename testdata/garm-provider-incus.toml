@@ -25,6 +25,11 @@ secure_boot = false
 # 0 the instance is force-stopped immediately and its lease stays allocated
 # until it expires.
 graceful_stop_timeout = 0
+# ip_wait_timeout is the number of seconds to wait for a new instance to report
+# an IPv4 address before its creation fails. For virtual machines Incus records
+# the address only once the in-guest agent is up, which on a loaded host can
+# take longer than the default of 100 seconds (0 keeps the default).
+ip_wait_timeout = 0
 # Project name to use. You can create a separate project in Incus for runners.
 project_name = "default"
 # URL is the address on which Incus listens for connections (ex: https://example.com:8443)

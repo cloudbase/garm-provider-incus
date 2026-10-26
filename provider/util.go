@@ -190,8 +190,21 @@ func resolveArchitecture(osArch commonParams.OSArch) (string, error) {
 	return arch, nil
 }
 
-// waitDeviceActive is a function capable of figuring out when a Equinix Metal
-// device is active
+// ipWaitDelay is the interval between checks for a new instance's IPv4 address.
+const ipWaitDelay = 5 * time.Second
+
+// ipWaitAttempts is how many checks, ipWaitDelay apart, cover timeout: at
+// least one, rounded up so the wait is never shorter than configured.
+func ipWaitAttempts(timeout time.Duration) int {
+	attempts := int((timeout + ipWaitDelay - 1) / ipWaitDelay)
+	if attempts < 1 {
+		return 1
+	}
+	return attempts
+}
+
+// waitInstanceHasIP waits, up to the configured ip_wait_timeout, for the
+// instance to report an IPv4 address.
 func (l *Incus) waitInstanceHasIP(ctx context.Context, instanceName string) (commonParams.ProviderInstance, error) {
 	var p commonParams.ProviderInstance
 	errIPNotFound := fmt.Errorf("ip not found")
@@ -214,8 +227,8 @@ func (l *Incus) waitInstanceHasIP(ctx context.Context, instanceName string) (com
 			}
 			return errIPNotFound
 		},
-		Attempts: 20,
-		Delay:    5 * time.Second,
+		Attempts: ipWaitAttempts(l.cfg.GetIPWaitTimeout()),
+		Delay:    ipWaitDelay,
 		Clock:    clock.WallClock,
 	})
 

@@ -18,6 +18,7 @@ package provider
 import (
 	"context"
 	"testing"
+	"time"
 
 	commonParams "github.com/cloudbase/garm-provider-common/params"
 	"github.com/cloudbase/garm-provider-incus/config"
@@ -138,4 +139,13 @@ func TestGetClientFromConfig(t *testing.T) {
 		})
 	}
 
+}
+
+func TestIPWaitAttempts(t *testing.T) {
+	// The default keeps the previous fixed wait: 20 checks, 5 seconds apart.
+	assert.Equal(t, 20, ipWaitAttempts(config.DefaultIPWaitTimeout))
+	// Rounded up, so the wait is never shorter than configured.
+	assert.Equal(t, 61, ipWaitAttempts(301*time.Second))
+	assert.Equal(t, 1, ipWaitAttempts(time.Second))
+	assert.Equal(t, 1, ipWaitAttempts(0))
 }

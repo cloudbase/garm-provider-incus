@@ -18,6 +18,7 @@ package config
 import (
 	"os"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -95,6 +96,23 @@ func TestIncusNegativeGracefulStopTimeout(t *testing.T) {
 	err := cfg.Validate()
 	require.NotNil(t, err)
 	require.EqualError(t, err, "graceful_stop_timeout must not be negative")
+}
+
+func TestIncusNegativeIPWaitTimeout(t *testing.T) {
+	cfg := getDefaultIncusConfig()
+
+	cfg.IPWaitTimeout = -1
+	err := cfg.Validate()
+	require.NotNil(t, err)
+	require.EqualError(t, err, "ip_wait_timeout must not be negative")
+}
+
+func TestIncusIPWaitTimeout(t *testing.T) {
+	cfg := getDefaultIncusConfig()
+	require.Equal(t, DefaultIPWaitTimeout, cfg.GetIPWaitTimeout())
+
+	cfg.IPWaitTimeout = 300
+	require.Equal(t, 300*time.Second, cfg.GetIPWaitTimeout())
 }
 
 func TestIncusWithInvalidUnixSocket(t *testing.T) {
