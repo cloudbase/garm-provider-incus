@@ -53,7 +53,7 @@ github.com/felixge/httpsnoop
 # github.com/flosch/pongo2/v6 v6.1.0
 ## explicit; go 1.18
 github.com/flosch/pongo2/v6
-# github.com/go-jose/go-jose/v4 v4.1.5
+# github.com/go-jose/go-jose/v4 v4.1.6
 ## explicit; go 1.24.0
 github.com/go-jose/go-jose/v4
 github.com/go-jose/go-jose/v4/cipher
