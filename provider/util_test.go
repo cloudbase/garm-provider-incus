@@ -139,3 +139,49 @@ func TestGetClientFromConfig(t *testing.T) {
 	}
 
 }
+
+// TestResolveArchitecture checks that every architecture GARM supports maps
+// to its Incus name, and that the Incus name maps back to the same
+// architecture, so instances listed from Incus report the arch they were
+// created with.
+func TestResolveArchitecture(t *testing.T) {
+	tests := []struct {
+		osArch commonParams.OSArch
+		want   string
+	}{
+		{osArch: "amd64", want: "x86_64"},
+		{osArch: "arm64", want: "aarch64"},
+		{osArch: "arm", want: "armv7l"},
+		{osArch: "ppc64le", want: "ppc64le"},
+		{osArch: "s390x", want: "s390x"},
+		{osArch: "riscv64", want: "riscv64"},
+	}
+
+	for _, tt := range tests {
+		t.Run(string(tt.osArch), func(t *testing.T) {
+			got, err := resolveArchitecture(tt.osArch)
+			assert.NoError(t, err)
+			assert.Equal(t, tt.want, got)
+			assert.Equal(t, tt.osArch, incusToConfigArch[got])
+		})
+	}
+
+	t.Run("empty defaults to amd64", func(t *testing.T) {
+		got, err := resolveArchitecture("")
+		assert.NoError(t, err)
+		assert.Equal(t, "x86_64", got)
+	})
+}
+
+// TestResolveArchitectureErrors checks that architectures with no Incus
+// mapping are rejected rather than passed through to Incus.
+func TestResolveArchitectureErrors(t *testing.T) {
+	tests := []commonParams.OSArch{"i386", "mips64", "x86_64"}
+
+	for _, osArch := range tests {
+		t.Run(string(osArch), func(t *testing.T) {
+			_, err := resolveArchitecture(osArch)
+			assert.ErrorContains(t, err, "is not supported")
+		})
+	}
+}
