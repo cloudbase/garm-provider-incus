@@ -14,12 +14,19 @@
 
 package errors
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/cloudbase/garm-provider-common/params"
+)
 
 var (
 	// ErrUnauthorized is returned when a user does not have
 	// authorization to perform a request
 	ErrUnauthorized = NewUnauthorizedError("Unauthorized")
+	// ErrForbidden is returned when a user does not have
+	// permission to perform a request
+	ErrForbidden = NewForbiddenError("Forbidden")
 	// ErrNotFound is returned if an object is not found in
 	// the database.
 	ErrNotFound = NewNotFoundError("not found")
@@ -32,6 +39,7 @@ var (
 	ErrTimeout          = NewTimeoutError("timed out")
 	ErrUnprocessable    = NewUnprocessableError("cannot process request")
 	ErrNoPoolsAvailable = NewNoPoolsAvailableError("no pools available")
+	ErrNoCapacity       = NewNoCapacityError("no capacity available")
 )
 
 type baseError struct {
@@ -43,7 +51,7 @@ func (b *baseError) Error() string {
 }
 
 // NewProviderError returns a new ProviderError
-func NewProviderError(msg string, a ...interface{}) error {
+func NewProviderError(msg string, a ...any) error {
 	return &ProviderError{
 		baseError{
 			msg: fmt.Sprintf(msg, a...),
@@ -66,7 +74,7 @@ func (p *ProviderError) Is(target error) bool {
 }
 
 // NewMissingSecretError returns a new MissingSecretError
-func NewMissingSecretError(msg string, a ...interface{}) error {
+func NewMissingSecretError(msg string, a ...any) error {
 	return &MissingSecretError{
 		baseError{
 			msg: fmt.Sprintf(msg, a...),
@@ -89,10 +97,10 @@ func (p *MissingSecretError) Is(target error) bool {
 }
 
 // NewUnauthorizedError returns a new UnauthorizedError
-func NewUnauthorizedError(msg string) error {
+func NewUnauthorizedError(msg string, a ...any) error {
 	return &UnauthorizedError{
 		baseError{
-			msg: msg,
+			msg: fmt.Sprintf(msg, a...),
 		},
 	}
 }
@@ -111,8 +119,31 @@ func (p *UnauthorizedError) Is(target error) bool {
 	return ok
 }
 
+// NewForbiddenError returns a new ForbiddenError
+func NewForbiddenError(msg string, a ...any) error {
+	return &ForbiddenError{
+		baseError{
+			msg: fmt.Sprintf(msg, a...),
+		},
+	}
+}
+
+// ForbiddenError is returned when a request is not allowed
+type ForbiddenError struct {
+	baseError
+}
+
+func (p *ForbiddenError) Is(target error) bool {
+	if target == nil {
+		return false
+	}
+
+	_, ok := target.(*ForbiddenError)
+	return ok
+}
+
 // NewNotFoundError returns a new NotFoundError
-func NewNotFoundError(msg string, a ...interface{}) error {
+func NewNotFoundError(msg string, a ...any) error {
 	return &NotFoundError{
 		baseError{
 			msg: fmt.Sprintf(msg, a...),
@@ -135,10 +166,10 @@ func (p *NotFoundError) Is(target error) bool {
 }
 
 // NewDuplicateUserError returns a new DuplicateUserError
-func NewDuplicateUserError(msg string) error {
+func NewDuplicateUserError(msg string, a ...any) error {
 	return &DuplicateUserError{
 		baseError{
-			msg: msg,
+			msg: fmt.Sprintf(msg, a...),
 		},
 	}
 }
@@ -158,7 +189,7 @@ func (p *DuplicateUserError) Is(target error) bool {
 }
 
 // NewBadRequestError returns a new BadRequestError
-func NewBadRequestError(msg string, a ...interface{}) error {
+func NewBadRequestError(msg string, a ...any) error {
 	return &BadRequestError{
 		baseError{
 			msg: fmt.Sprintf(msg, a...),
@@ -181,7 +212,7 @@ func (p *BadRequestError) Is(target error) bool {
 }
 
 // NewConflictError returns a new ConflictError
-func NewConflictError(msg string, a ...interface{}) error {
+func NewConflictError(msg string, a ...any) error {
 	return &ConflictError{
 		baseError{
 			msg: fmt.Sprintf(msg, a...),
@@ -204,7 +235,7 @@ func (p *ConflictError) Is(target error) bool {
 }
 
 // NewTimeoutError returns a new TimoutError
-func NewTimeoutError(msg string, a ...interface{}) error {
+func NewTimeoutError(msg string, a ...any) error {
 	return &TimoutError{
 		baseError{
 			msg: fmt.Sprintf(msg, a...),
@@ -227,15 +258,15 @@ func (p *TimoutError) Is(target error) bool {
 }
 
 // NewUnprocessableError returns a new UnprocessableError
-func NewUnprocessableError(msg string, a ...interface{}) error {
-	return &TimoutError{
+func NewUnprocessableError(msg string, a ...any) error {
+	return &UnprocessableError{
 		baseError{
 			msg: fmt.Sprintf(msg, a...),
 		},
 	}
 }
 
-// TimoutError is returned when an operation times out.
+// UnprocessableError is returned when a request cannot be processed.
 type UnprocessableError struct {
 	baseError
 }
@@ -249,16 +280,16 @@ func (p *UnprocessableError) Is(target error) bool {
 	return ok
 }
 
-// NewNoPoolsAvailableError returns a new UnprocessableError
-func NewNoPoolsAvailableError(msg string, a ...interface{}) error {
-	return &TimoutError{
+// NewNoPoolsAvailableError returns a new NoPoolsAvailableError
+func NewNoPoolsAvailableError(msg string, a ...any) error {
+	return &NoPoolsAvailableError{
 		baseError{
 			msg: fmt.Sprintf(msg, a...),
 		},
 	}
 }
 
-// NoPoolsAvailableError is returned when anthere are not pools available.
+// NoPoolsAvailableError is returned when there are no pools available.
 type NoPoolsAvailableError struct {
 	baseError
 }
@@ -270,4 +301,66 @@ func (p *NoPoolsAvailableError) Is(target error) bool {
 
 	_, ok := target.(*NoPoolsAvailableError)
 	return ok
+}
+
+// NewNoCapacityError returns a new NoCapacityError
+func NewNoCapacityError(msg string, a ...any) error {
+	return &NoCapacityError{
+		baseError{
+			msg: fmt.Sprintf(msg, a...),
+		},
+	}
+}
+
+// NoCapacityError is returned when there is no capacity available.
+type NoCapacityError struct {
+	baseError
+}
+
+func (p *NoCapacityError) Is(target error) bool {
+	if target == nil {
+		return false
+	}
+
+	_, ok := target.(*NoCapacityError)
+	return ok
+}
+
+// NewInstanceTransitionError returns an InstanceTransitionError describing an
+// invalid instance status state machine transition.
+func NewInstanceTransitionError(from, to params.InstanceStatus) error {
+	return &InstanceTransitionError{
+		baseError: baseError{
+			msg: fmt.Sprintf("invalid instance status transition from %s to %s", from, to),
+		},
+		From: from,
+		To:   to,
+	}
+}
+
+// InstanceTransitionError is returned when a requested instance status
+// transition is rejected by the state machine. It carries the current (From)
+// and requested (To) statuses as their proper type, so callers working with a
+// params.Instance can compare them directly (via errors.As) without casting
+// through strings, and decide whether the refusal is benign for their intent
+// (for example, the instance is already further along the same terminal path)
+// or a genuine error to stop on. It also reports as a BadRequestError, so it
+// maps to an HTTP 400.
+type InstanceTransitionError struct {
+	baseError
+	From params.InstanceStatus
+	To   params.InstanceStatus
+}
+
+func (e *InstanceTransitionError) Is(target error) bool {
+	if target == nil {
+		return false
+	}
+
+	switch target.(type) {
+	case *InstanceTransitionError, *BadRequestError:
+		return true
+	default:
+		return false
+	}
 }
