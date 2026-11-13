@@ -124,7 +124,8 @@ type Incus struct {
 	// imageManager downloads images from remotes
 	imageManager *image
 	// controllerID is the ID of this controller
-	controllerID string
+	controllerID             string
+	admissionBackendIdentity string
 
 	mux sync.Mutex
 }
@@ -192,6 +193,12 @@ func (l *Incus) getCreateInstanceArgs(ctx context.Context, bootstrapParams commo
 	if bootstrapParams.Name == "" {
 		return api.InstancesPost{}, runnerErrors.NewBadRequestError("missing name")
 	}
+	if specs.AdmissionResources != nil {
+		identity, err := l.admissionBackend(ctx)
+		if err != nil || identity != specs.AdmissionResources.BackendIdentity {
+			return api.InstancesPost{}, fmt.Errorf("admission backend identity unavailable or changed")
+		}
+	}
 	profiles, err := l.getProfiles(ctx, bootstrapParams.Flavor)
 	if err != nil {
 		return api.InstancesPost{}, errors.Wrap(err, "fetching profiles")
@@ -203,6 +210,20 @@ func (l *Incus) getCreateInstanceArgs(ctx context.Context, bootstrapParams commo
 	}
 
 	instanceType := l.cfg.GetInstanceType()
+	var admittedConfig map[string]string
+	var admittedDevices map[string]map[string]string
+	if specs.AdmissionResources != nil {
+		if instanceType != config.IncusImageVirtualMachine || !isExactFingerprint(bootstrapParams.Image) {
+			return api.InstancesPost{}, fmt.Errorf("admitted create requires a VM and exact image fingerprint")
+		}
+		admittedConfig, admittedDevices, err = l.admissionProfile(ctx, bootstrapParams.Flavor, specs.AdmissionResources.vector())
+		if err != nil {
+			return api.InstancesPost{}, fmt.Errorf("validating admitted profile: %w", err)
+		}
+		// Profile contents are copied into this instance to prevent a profile update
+		// after validation from changing its resource footprint or adding disks.
+		profiles = []string{}
+	}
 	instanceSource, err := l.imageManager.getInstanceSource(bootstrapParams.Image, instanceType, arch, l.cli)
 	if err != nil {
 		return api.InstancesPost{}, errors.Wrap(err, "getting instance source")
@@ -236,6 +257,11 @@ func (l *Incus) getCreateInstanceArgs(ctx context.Context, bootstrapParams commo
 	if instanceType == config.IncusImageVirtualMachine {
 		configMap["security.secureboot"] = l.secureBootEnabled()
 	}
+	for key, value := range admittedConfig {
+		if _, overridden := configMap[key]; !overridden {
+			configMap[key] = value
+		}
+	}
 
 	args := api.InstancesPost{
 		InstancePut: api.InstancePut{
@@ -243,6 +269,7 @@ func (l *Incus) getCreateInstanceArgs(ctx context.Context, bootstrapParams commo
 			Profiles:     profiles,
 			Description:  "Github runner provisioned by garm",
 			Config:       configMap,
+			Devices:      admittedDevices,
 		},
 		Source: instanceSource,
 		Name:   bootstrapParams.Name,
