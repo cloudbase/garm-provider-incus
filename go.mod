@@ -4,7 +4,7 @@ go 1.26.7
 
 require (
 	github.com/BurntSushi/toml v1.6.0
-	github.com/cloudbase/garm-provider-common v0.1.9
+	github.com/cloudbase/garm-provider-common v0.1.10-0.20261111212522-a63fbe8afd51
 	github.com/gorilla/websocket v1.5.4-0.20250319132907-e064f32e3674
 	github.com/invopop/jsonschema v0.14.0
 	github.com/juju/clock v1.1.1
@@ -78,5 +78,4 @@ require (
 	golang.org/x/text v0.42.0 // indirect
 	google.golang.org/protobuf v1.36.12 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

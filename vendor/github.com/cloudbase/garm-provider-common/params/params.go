@@ -15,7 +15,9 @@
 package params
 
 import (
+	"bytes"
 	"encoding/json"
+	"text/template"
 )
 
 type (
@@ -28,14 +30,18 @@ type (
 const (
 	Windows OSType = "windows"
 	Linux   OSType = "linux"
+	Darwin  OSType = "darwin"
 	Unknown OSType = "unknown"
 )
 
 const (
-	Amd64 OSArch = "amd64"
-	I386  OSArch = "i386"
-	Arm64 OSArch = "arm64"
-	Arm   OSArch = "arm"
+	Amd64   OSArch = "amd64"
+	I386    OSArch = "i386"
+	Arm64   OSArch = "arm64"
+	Arm     OSArch = "arm"
+	Ppc64le OSArch = "ppc64le"
+	S390x   OSArch = "s390x"
+	Riscv64 OSArch = "riscv64"
 )
 
 const (
@@ -55,6 +61,62 @@ const (
 	PublicAddress  AddressType = "public"
 	PrivateAddress AddressType = "private"
 )
+
+var bootCmdProxyTemplate = `{{- if .HTTPProxy }}
+HTTP_PROXY="{{.HTTPProxy}}"
+{{- end}}
+{{- if .HTTPSProxy }}
+HTTPS_PROXY="{{.HTTPSProxy}}"
+{{- end}}
+{{- if .NoProxy }}
+NO_PROXY="{{.NoProxy}}"
+{{- end}}
+if [ -d "/etc/apt/apt.conf.d" ]; then
+	APT_PROXY_CONF="/etc/apt/apt.conf.d/95garm-proxy"
+	: > "$APT_PROXY_CONF"
+	[ -n "$HTTP_PROXY" ] && printf 'Acquire::http::Proxy "%s";\n' "$HTTP_PROXY" >> "$APT_PROXY_CONF"
+	[ -n "$HTTPS_PROXY" ] && printf 'Acquire::https::Proxy "%s";\n' "$HTTPS_PROXY" >> "$APT_PROXY_CONF"
+elif [ -f /etc/dnf/dnf.conf ]; then
+	PROXY="${HTTP_PROXY:-$HTTPS_PROXY}"
+	[ -n "$PROXY" ] && grep -q '^proxy=' /etc/dnf/dnf.conf || echo "proxy=$PROXY" >> /etc/dnf/dnf.conf
+elif [ -f /etc/yum.conf ]; then
+	PROXY="${HTTP_PROXY:-$HTTPS_PROXY}"
+	[ -n "$PROXY" ] && grep -q '^proxy=' /etc/yum.conf || echo "proxy=$PROXY" >> /etc/yum.conf
+elif [ -d /etc/zypp ]; then
+	printf 'PROXY_ENABLED="yes"\n' > /etc/sysconfig/proxy
+	[ -n "$HTTP_PROXY" ] && printf 'HTTP_PROXY="%s"\n' "$HTTP_PROXY" >> /etc/sysconfig/proxy
+	[ -n "$HTTPS_PROXY" ] && printf 'HTTPS_PROXY="%s"\n' "$HTTPS_PROXY" >> /etc/sysconfig/proxy
+	[ -n "$NO_PROXY" ] && printf 'NO_PROXY="%s"\n' "$NO_PROXY" >> /etc/sysconfig/proxy
+fi
+`
+
+type ProxyConfig struct {
+	HTTPProxy  string `json:"http_proxy"`
+	HTTPSProxy string `json:"https_proxy"`
+	NoProxy    string `json:"no_proxy"`
+}
+
+func (p ProxyConfig) GetBootCmd() (string, bool) {
+	if !p.HasProxy() {
+		return "", false
+	}
+
+	tmpl, err := template.New("bootcmd-proxy").Parse(bootCmdProxyTemplate)
+	if err != nil {
+		return "", false
+	}
+
+	var buf bytes.Buffer
+	if err := tmpl.Execute(&buf, p); err != nil {
+		return "", false
+	}
+
+	return buf.String(), true
+}
+
+func (p ProxyConfig) HasProxy() bool {
+	return p.HTTPProxy != "" || p.HTTPSProxy != ""
+}
 
 type UserDataOptions struct {
 	DisableUpdatesOnBoot bool     `json:"disable_updates_on_boot"`
@@ -98,7 +160,7 @@ type BootstrapInstance struct {
 	// OSArch is the target OS CPU architecture of the runner.
 	OSArch OSArch `json:"arch"`
 
-	// OSType is the target OS platform of the runner (windows, linux).
+	// OSType is the target OS platform of the runner (windows, linux, darwin).
 	OSType OSType `json:"os_type"`
 
 	// Flavor is the platform specific abstraction that defines what resources will be allocated
@@ -124,6 +186,10 @@ type BootstrapInstance struct {
 	// from the metadata service instead of the runner registration token. The runner registration token
 	// is not available if the runner is configured to use JIT.
 	JitConfigEnabled bool `json:"jit_config_enabled"`
+
+	// ProxyConfig is the proxy configuration that gets added to the cloud-init
+	// config.
+	ProxyConfig ProxyConfig `json:"proxy_config"`
 }
 
 type Address struct {
@@ -143,8 +209,8 @@ type ProviderInstance struct {
 	// instance.
 	Name string `json:"name,omitempty"`
 
-	// OSType is the operating system type. For now, only Linux and
-	// Windows are supported.
+	// OSType is the operating system type. Supported values are Linux,
+	// Windows and Darwin.
 	OSType OSType `json:"os_type,omitempty"`
 
 	// OSName is the name of the OS. Eg: ubuntu, centos, etc.

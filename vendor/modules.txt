@@ -20,7 +20,7 @@ github.com/buger/jsonparser
 # github.com/cespare/xxhash/v2 v2.3.0
 ## explicit; go 1.11
 github.com/cespare/xxhash/v2
-# github.com/cloudbase/garm-provider-common v0.1.9
+# github.com/cloudbase/garm-provider-common v0.1.10-0.20261111212522-a63fbe8afd51
 ## explicit; go 1.25.0
 github.com/cloudbase/garm-provider-common/cloudconfig
 github.com/cloudbase/garm-provider-common/defaults
@@ -362,6 +362,3 @@ google.golang.org/protobuf/runtime/protoimpl
 # gopkg.in/natefinch/lumberjack.v2 v2.2.1
 ## explicit; go 1.13
 gopkg.in/natefinch/lumberjack.v2
-# gopkg.in/yaml.v3 v3.0.1
-## explicit
-gopkg.in/yaml.v3
