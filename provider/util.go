@@ -114,10 +114,17 @@ func incusStatusToProviderStatus(status string) commonParams.InstanceStatus {
 }
 
 func getClientFromConfig(ctx context.Context, cfg *config.Incus) (cli incus.InstanceServer, err error) {
+	return getClientFromConfigWithPin(ctx, cfg, false)
+}
+
+func getClientFromConfigWithPin(ctx context.Context, cfg *config.Incus, pin bool) (cli incus.InstanceServer, err error) {
 	if cfg == nil {
 		return nil, fmt.Errorf("no Incus configuration found")
 	}
 
+	if pin && (cfg.UnixSocket != "" || cfg.TLSServerCert == "" || !strings.HasPrefix(cfg.URL, "https://")) {
+		return nil, fmt.Errorf("admission requires pinned TLS endpoint")
+	}
 	if cfg.UnixSocket != "" {
 		return incus.ConnectIncusUnixWithContext(ctx, cfg.UnixSocket, &incus.ConnectionArgs{SkipGetServer: true})
 	}
@@ -157,11 +164,12 @@ func getClientFromConfig(ctx context.Context, cfg *config.Incus) (cli incus.Inst
 	}
 
 	connectArgs := incus.ConnectionArgs{
-		TLSServerCert: string(srvCrtContents),
-		TLSCA:         string(tlsCAContents),
-		TLSClientCert: string(clientCertContents),
-		TLSClientKey:  string(clientKeyContents),
-		SkipGetServer: true,
+		TLSServerCert:        string(srvCrtContents),
+		TLSCA:                string(tlsCAContents),
+		TLSClientCert:        string(clientCertContents),
+		TLSClientKey:         string(clientKeyContents),
+		SkipGetServer:        true,
+		IdenticalCertificate: pin,
 	}
 
 	incusCLI, err := incus.ConnectIncus(cfg.URL, &connectArgs)

@@ -138,3 +138,55 @@ You can also set a spec when creating a new pool, using the same flag.
 Workers in that pool will be created taking into account the specs you set on the pool.
 
 Aside from the above schema, this provider also supports the generic schema implemented by [`garm-provider-common`](https://github.com/cloudbase/garm-provider-common/tree/main#userdata)
+
+### Experimental readiness probe
+
+`GARM_COMMAND=readiness_v1` accepts one JSON request on standard input and
+returns a JSON response with the request echoed, an image fingerprint, checks,
+and timestamps valid for at most 15 seconds. The command is limited to 20
+seconds and rejects unknown fields. Existing provider commands are unchanged.
+This experimental protocol checks a trusted, non-clustered Incus server and
+its driver and architecture, the configured project and its reported quota,
+the selected profiles and their effective numeric CPU, memory and root disk
+limits, and an exact local image fingerprint of the requested architecture and type. Aliases, remote images,
+unknown limits and unavailable checks fail closed.
+
+A positive result only confirms these read-only checks at that moment. It does
+not establish permission to create an instance, KVM health, future operation
+success, or host-wide free capacity. The consumer must require explicit host
+capability approval and enforce a shared resource budget with an allowance for
+other workloads. Project quota observations are snapshots, not reservations. An unlimited Incus
+quota requires the consumer's separately configured finite budget and outside
+workload envelope.
+
+For admitted creates, `admission_resources` supplies the reserved CPU count,
+memory bytes, root disk bytes, and VM slot count. The provider rejects a profile
+whose explicit limits differ from that vector, profiles with raw settings or
+devices other than one root disk and NICs, physical or SR-IOV NICs, and
+non-fingerprint images. It snapshots the merged profile into the
+instance request without attaching mutable profiles and pins its resource limits.
+
+The optional `absence_v1` command reports the
+`incus-single-node-absence-v1` observation only for a trusted non-clustered
+Incus 6.0 server and the configured project. It accepts an exact instance name
+and reports absence only on a typed Incus HTTP 404. The caller must have
+established a completed create and delete, exclude in-flight creates and name
+reuse, and use the same server and project; an uncertain create remains charged.
+The [Incus 6.0 delete operation](https://github.com/lxc/incus/blob/stable-6.0/cmd/incusd/instance_delete.go#L77-L89)
+and [QEMU deletion path](https://github.com/lxc/incus/blob/stable-6.0/internal/server/instance/drivers/driver_qemu.go#L6786-L6817)
+provide the source basis for this narrow contract. This source analysis is not
+an integration test or a general guarantee for other server versions or providers.
+
+These experimental operations require a configured HTTPS endpoint and an exact
+pinned server certificate. The provider hashes the certificate's DER, endpoint,
+and project as the backend identity and requires the same identity for admitted
+creation, deletion, and absence checks. Unix sockets and CA-only connections
+are not supported by this experimental contract. `delete_admitted_v1` verifies
+that identity in the same process before starting deletion. A failed or timed-out
+delete remains uncertain; the caller retains its reservation until the separate
+absence check succeeds under the documented preconditions.
+
+The readiness response advertises `incus-single-node-sync-v1` only for the
+verified Incus 6.0 single-node path: a successful provider create waits for the
+create and start operations and the instance IP. The caller must treat errors,
+timeouts, and non-running results as uncertain.
