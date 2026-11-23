@@ -70,6 +70,11 @@ type InstanceState struct {
 	//
 	// API extension: instances_state_os_info.
 	OSInfo *InstanceStateOSInfo `json:"os_info" yaml:"os_info"`
+
+	// TPM devices information.
+	//
+	// API extension: instances_state_tpm.
+	TPM map[string]InstanceStateTPM `json:"tpm" yaml:"tpm"`
 }
 
 // InstanceStateDisk represents the disk information section of an instance's state.
@@ -87,6 +92,11 @@ type InstanceStateDisk struct {
 	//
 	// API extension: instances_state_total
 	Total int64 `json:"total" yaml:"total"`
+
+	// Disk I/O counters
+	//
+	// API extension: instance_state_disk_counters
+	Counters *InstanceStateDiskCounters `json:"counters,omitempty" yaml:"counters,omitempty"`
 }
 
 // InstanceStateCPU represents the cpu information section of an instance's state.
@@ -232,6 +242,30 @@ type InstanceStateNetworkCounters struct {
 	PacketsDroppedInbound int64 `json:"packets_dropped_inbound" yaml:"packets_dropped_inbound"`
 }
 
+// InstanceStateDiskCounters represents I/O counters as part of the disk section of an
+// instance's state.
+//
+// swagger:model
+//
+// API extension: instance_state_disk_counters.
+type InstanceStateDiskCounters struct {
+	// Number of bytes read
+	// Example: 3567021
+	BytesRead int64 `json:"bytes_read" yaml:"bytes_read"`
+
+	// Number of bytes written
+	// Example: 1748969
+	BytesWritten int64 `json:"bytes_written" yaml:"bytes_written"`
+
+	// Number of read operations completed
+	// Example: 3844
+	ReadsCompleted int64 `json:"reads_completed" yaml:"reads_completed"`
+
+	// Number of write operations completed
+	// Example: 2071
+	WritesCompleted int64 `json:"writes_completed" yaml:"writes_completed"`
+}
+
 // InstanceStateOSInfo represents the operating system information section of an instance's state.
 //
 // swagger:model
@@ -257,4 +291,36 @@ type InstanceStateOSInfo struct {
 	// FQDN of the instance.
 	// Example: myhost.mydomain.local
 	FQDN string `json:"fqdn" yaml:"fqdn"`
+}
+
+// InstanceStateTPM represents the state of a TPM device.
+//
+// swagger:model
+//
+// API extension: instances_state_tpm.
+type InstanceStateTPM struct {
+	// Endorsement keys, when known.
+	EndorsementKeys []InstanceStateTPMKey `json:"endorsement_keys" yaml:"endorsement_keys"`
+}
+
+// InstanceStateTPMKey represents a TPM key.
+//
+// swagger:model
+//
+// API extension: instances_state_tpm.
+type InstanceStateTPMKey struct {
+	// Key type (`rsa` or `ecc`).
+	// Example: rsa
+	Type string `json:"type" yaml:"type"`
+
+	// Key size in bits.
+	// Example: 2048
+	Size int `json:"size" yaml:"size"`
+
+	// SHA-256 fingerprint of the DER encoded public key.
+	// Example: 9ba3cb7ba7ac7f6a45cf0d21c8b5ebc0d1f9e1d3d1d7a4e0f1c1e7d1c3a2b5c6
+	Fingerprint string `json:"fingerprint" yaml:"fingerprint"`
+
+	// PEM encoded public key.
+	PublicKey string `json:"public_key" yaml:"public_key"`
 }

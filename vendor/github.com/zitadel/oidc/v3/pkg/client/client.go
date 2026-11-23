@@ -2,6 +2,7 @@ package client
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -12,6 +13,7 @@ import (
 	"time"
 
 	"github.com/go-jose/go-jose/v4"
+	"github.com/google/uuid"
 	"github.com/zitadel/oidc/v3/internal/otel"
 	"golang.org/x/oauth2"
 
@@ -79,9 +81,20 @@ func CallTokenEndpointWithAuthFn(ctx context.Context, request any, authFn any, c
 		return nil, err
 	}
 
-	tokenRes := new(oidc.AccessTokenResponse)
-	if err := httphelper.HttpRequest(caller.HttpClient(), req, &tokenRes); err != nil {
+	var body json.RawMessage
+	if err := httphelper.HttpRequest(caller.HttpClient(), req, &body); err != nil {
 		return nil, err
+	}
+	tokenRes := new(oidc.AccessTokenResponse)
+	if err := json.Unmarshal(body, tokenRes); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal token response: %w", err)
+	}
+	// Keep every field of the response, not only id_token, so callers can read
+	// provider specific values such as refresh_expires_in through Token.Extra,
+	// the same way golang.org/x/oauth2 does for the code exchange.
+	var extra map[string]any
+	if err := json.Unmarshal(body, &extra); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal token response: %w", err)
 	}
 	token := &oauth2.Token{
 		AccessToken:  tokenRes.AccessToken,
@@ -89,12 +102,7 @@ func CallTokenEndpointWithAuthFn(ctx context.Context, request any, authFn any, c
 		RefreshToken: tokenRes.RefreshToken,
 		Expiry:       time.Now().UTC().Add(time.Duration(tokenRes.ExpiresIn) * time.Second),
 	}
-	if tokenRes.IDToken != "" {
-		token = token.WithExtra(map[string]any{
-			"id_token": tokenRes.IDToken,
-		})
-	}
-	return token, nil
+	return token.WithExtra(extra), nil
 }
 
 type EndSessionCaller interface {
@@ -148,10 +156,12 @@ type RevokeCaller interface {
 }
 
 type RevokeRequest struct {
-	Token         string `schema:"token"`
-	TokenTypeHint string `schema:"token_type_hint"`
-	ClientID      string `schema:"client_id"`
-	ClientSecret  string `schema:"client_secret"`
+	Token               string `schema:"token"`
+	TokenTypeHint       string `schema:"token_type_hint"`
+	ClientID            string `schema:"client_id"`
+	ClientSecret        string `schema:"client_secret,omitempty"`
+	ClientAssertion     string `schema:"client_assertion,omitempty"`
+	ClientAssertionType string `schema:"client_assertion_type,omitempty"`
 }
 
 // Deprecated: This function is no longer invoked because it violates
@@ -231,6 +241,10 @@ func NewSignerFromPrivateKeyByte(key []byte, keyID string) (jose.Signer, error) 
 }
 
 func SignedJWTProfileAssertion(clientID string, audience []string, expiration time.Duration, signer jose.Signer) (string, error) {
+	jti, err := uuid.NewRandom()
+	if err != nil {
+		return "", err
+	}
 	iat := time.Now()
 	exp := iat.Add(expiration)
 	return crypto.Sign(&oidc.JWTTokenRequest{
@@ -239,6 +253,7 @@ func SignedJWTProfileAssertion(clientID string, audience []string, expiration ti
 		Audience:  audience,
 		ExpiresAt: oidc.FromTime(exp),
 		IssuedAt:  oidc.FromTime(iat),
+		JWTID:     jti.String(),
 	}, signer)
 }
 
