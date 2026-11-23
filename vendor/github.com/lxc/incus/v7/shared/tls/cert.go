@@ -32,6 +32,15 @@ import (
 	"github.com/lxc/incus/v7/shared/util"
 )
 
+// NewCertInfo creates a new CertInfo object from the given fields.
+func NewCertInfo(keypair tls.Certificate, ca *x509.Certificate, crl *x509.RevocationList) *CertInfo {
+	return &CertInfo{
+		keypair: keypair,
+		ca:      ca,
+		crl:     crl,
+	}
+}
+
 // KeyPairAndCA returns a CertInfo object with a reference to the key pair and
 // (optionally) CA certificate located in the given directory and having the
 // given name prefix
@@ -141,6 +150,16 @@ func (c *CertInfo) CA() *x509.Certificate {
 func (c *CertInfo) PublicKey() []byte {
 	data := c.KeyPair().Certificate[0]
 	return pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: data})
+}
+
+// PublicKeyChain is a convenience to encode the full certificate chain to ASCII.
+func (c *CertInfo) PublicKeyChain() []byte {
+	var chain []byte
+	for _, cert := range c.KeyPair().Certificate {
+		chain = append(chain, pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: cert})...)
+	}
+
+	return chain
 }
 
 // PublicKeyX509 is a convenience to return the underlying public key as an *x509.Certificate.
@@ -424,6 +443,16 @@ func CertFingerprintStr(c string) (string, error) {
 
 // GetRemoteCertificate gets the x509 certificate from a remote HTTPS server.
 func GetRemoteCertificate(address string, useragent string) (*x509.Certificate, error) {
+	certs, err := GetRemoteCertificates(address, useragent)
+	if err != nil {
+		return nil, err
+	}
+
+	return certs[0], nil
+}
+
+// GetRemoteCertificates connects to the server and returns its full certificate chain.
+func GetRemoteCertificates(address string, useragent string) ([]*x509.Certificate, error) {
 	// Setup a permissive TLS config
 	tlsConfig, err := GetTLSConfig(nil)
 	if err != nil {
@@ -462,7 +491,7 @@ func GetRemoteCertificate(address string, useragent string) (*x509.Certificate, 
 		return nil, errors.New("Unable to read remote TLS certificate")
 	}
 
-	return resp.TLS.PeerCertificates[0], nil
+	return resp.TLS.PeerCertificates, nil
 }
 
 // CertificateTokenDecode decodes a base64 and JSON encoded certificate add token.
