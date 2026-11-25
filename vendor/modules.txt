@@ -81,19 +81,6 @@ github.com/gorilla/websocket
 # github.com/invopop/jsonschema v0.14.0
 ## explicit; go 1.24
 github.com/invopop/jsonschema
-# github.com/juju/clock v1.1.1
-## explicit; go 1.18
-github.com/juju/clock
-# github.com/juju/errors v1.0.0
-## explicit; go 1.18
-github.com/juju/errors
-# github.com/juju/loggo v1.0.0
-## explicit; go 1.14
-# github.com/juju/retry v1.0.1
-## explicit; go 1.17
-github.com/juju/retry
-# github.com/juju/testing v1.0.2
-## explicit; go 1.17
 # github.com/klauspost/compress v1.20.5
 ## explicit; go 1.25
 github.com/klauspost/compress
