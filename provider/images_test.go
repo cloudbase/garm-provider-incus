@@ -17,6 +17,7 @@ package provider
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/cloudbase/garm-provider-incus/config"
@@ -183,4 +184,31 @@ func TestGetInstanceSource_Error(t *testing.T) {
 	require.Error(t, err)
 	assert.Equal(t, api.InstanceSource{}, instanceSource)
 	cli.AssertExpectations(t)
+}
+
+func TestGetInstanceSourceFingerprint(t *testing.T) {
+	fingerprint := strings.Repeat("a", 64)
+	for _, tc := range []struct {
+		name string
+		img  *api.Image
+		fail bool
+	}{
+		{name: "exact", img: &api.Image{Fingerprint: fingerprint, Architecture: "x86_64", Type: "virtual-machine"}},
+		{name: "wrong fingerprint", img: &api.Image{Fingerprint: strings.Repeat("b", 64), Architecture: "x86_64", Type: "virtual-machine"}, fail: true},
+		{name: "wrong type", img: &api.Image{Fingerprint: fingerprint, Architecture: "x86_64", Type: "container"}, fail: true},
+		{name: "wrong arch", img: &api.Image{Fingerprint: fingerprint, Architecture: "aarch64", Type: "virtual-machine"}, fail: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			cli := new(MockIncusServer)
+			cli.On("GetImage", fingerprint).Return(tc.img, "", nil).Once()
+			got, err := (&image{}).getInstanceSource(fingerprint, config.IncusImageVirtualMachine, "x86_64", cli)
+			if tc.fail {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+				require.Equal(t, fingerprint, got.Fingerprint)
+			}
+			cli.AssertExpectations(t)
+		})
+	}
 }

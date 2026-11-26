@@ -16,6 +16,7 @@
 package provider
 
 import (
+	"encoding/hex"
 	"fmt"
 	"strings"
 
@@ -64,11 +65,28 @@ func (i *image) getLocalImageByAlias(imageName string, imageType config.IncusIma
 	return image, nil
 }
 
+func isExactFingerprint(value string) bool {
+	if len(value) != 64 || strings.ToLower(value) != value {
+		return false
+	}
+	_, err := hex.DecodeString(value)
+	return err == nil
+}
+
 func (i *image) getInstanceSource(imageName string, imageType config.IncusImageType, arch string, cli InstanceServerInterface) (api.InstanceSource, error) {
 	instanceSource := api.InstanceSource{
 		Type: "image",
 	}
-	if !strings.Contains(imageName, ":") {
+	if isExactFingerprint(imageName) {
+		details, _, err := cli.GetImage(imageName)
+		if err != nil {
+			return api.InstanceSource{}, errors.Wrap(err, "fetching image")
+		}
+		if details == nil || details.Fingerprint != imageName || details.Type != imageType.String() || details.Architecture != arch {
+			return api.InstanceSource{}, fmt.Errorf("image fingerprint, type or architecture mismatch")
+		}
+		instanceSource.Fingerprint = details.Fingerprint
+	} else if !strings.Contains(imageName, ":") {
 		// A remote was not specified, try to find an image using the imageName as
 		// an alias.
 		imageDetails, err := i.getLocalImageByAlias(imageName, imageType, arch, cli)
